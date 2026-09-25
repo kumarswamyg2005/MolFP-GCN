@@ -170,6 +170,7 @@ def train(cfg, seed, root=RUNS, verbose=True):
             raise RuntimeError(f"train loss became {loss} at epoch {epoch}")
         metrics, sel = score(cfg.dataset, y_val, predict(model, val_g, norm))
         writer.writerow([epoch, f"{loss:.5f}", f"{abs(sel):.5f}"])
+        log.flush()  # a crash still leaves a readable partial log
         if sel > best:
             best, best_epoch = sel, epoch
             torch.save(
