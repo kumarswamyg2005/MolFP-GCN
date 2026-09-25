@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# data: keep only checksums and split indices
+data/*
+!data/CHECKSUMS.txt
+!data/splits/
+
+# training outputs (checkpoints, logs)
+runs/
