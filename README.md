@@ -29,7 +29,8 @@ Full write-up: [reports/REPORT.md](reports/REPORT.md). Viva notes: [docs/EXPLAIN
 
 ## Reproduce
 
-Needs [uv](https://docs.astral.sh/uv/) and about 20 minutes on a laptop CPU.
+Needs [uv](https://docs.astral.sh/uv/). `make all` took 11 min on an Apple M2 CPU from a fresh clone
+(plus package download time on first install), and reproduced every committed result byte for byte.
 
 ```
 make all          # install, download, train 3 seeds x 2 models x 2 datasets, evaluate, figures, tests
