@@ -1,0 +1,92 @@
+/* MolFP-GCN demo. Tokens and rules from docs/DESIGN.md. @font-face rules are prepended by
+   streamlit_app.py (fonts embedded as data URIs so the demo works offline). */
+:root {
+  --paper: #F6F8F7;
+  --ink: #1C2321;
+  --graphite: #5E6B67;
+  --grid: #DCE3E0;
+  --signal: #2F6FB0;
+  --sal-low: #2F6FB0;
+  --sal-high: #B8412C;
+}
+
+/* hide Streamlit chrome */
+#MainMenu, header[data-testid="stHeader"], footer, [data-testid="stToolbar"],
+[data-testid="stDecoration"], [data-testid="stStatusWidget"] { display: none !important; }
+
+/* !important because Streamlit's widget styles are more specific. Icons (spans) excluded. */
+html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp button, .stApp li,
+.stApp td, .stApp th, .stApp summary p, .stApp div[data-baseweb="select"] div,
+[data-baseweb="popover"] li, [data-testid="stMarkdownContainer"] :is(div, span, figcaption) {
+  font-family: "Atkinson Hyperlegible", system-ui, sans-serif !important;
+}
+.stApp { background: var(--paper); color: var(--ink); font-size: 16px; }
+.block-container { max-width: 1180px; padding-top: 1.75rem; padding-bottom: 2rem; }
+
+/* header */
+.mf-head { display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--ink); padding-bottom: 12px; margin-bottom: 20px; }
+.mf-title { font-size: 28px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.mf-head span { font-size: 20px; color: var(--graphite); }
+
+/* section labels: sentence case, never all-caps */
+.mf-label { font-size: 20px; font-weight: 700; margin: 0 0 8px; color: var(--ink); }
+.mf-sub { font-size: 14px; color: var(--graphite); margin: 0; }
+.mf-rule { border: 0; border-top: 1px solid var(--grid); margin: 20px 0; }
+
+/* SMILES are code: the only monospace on the page */
+.stTextInput input, .mf-smiles {
+  font-family: "IBM Plex Mono", ui-monospace, monospace !important; font-size: 16px;
+}
+.stTextInput input { border-color: var(--grid); }
+.stTextInput input:focus { border-color: var(--signal); box-shadow: 0 0 0 2px rgba(47,111,176,.25); }
+.stButton button[kind="primary"] { background: var(--signal); border-color: var(--signal);
+  font-size: 16px; padding: 0.4rem 1.6rem; }
+
+/* molecule drawing: the memorable element */
+.mf-mol { position: relative; background: #fff; border: 1px solid var(--grid);
+  min-height: 420px; display: flex; align-items: center; justify-content: center; }
+.mf-mol svg { width: 100%; height: auto; max-width: 560px; display: block; }
+.mf-mol .mf-tint { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; animation: mf-fade 250ms ease-out both; }
+@keyframes mf-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mf-mol .mf-tint { animation: none; } }
+.mf-empty { color: var(--graphite); font-size: 16px; padding: 24px; }
+
+/* saliency colorbar: data, not decoration */
+.mf-cbar { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+  margin: 10px 0 4px; font-size: 14px; color: var(--graphite); }
+.mf-cbar div { height: 12px; border: 1px solid var(--grid);
+  background: linear-gradient(to right, var(--sal-low), #fff, var(--sal-high)); }
+
+/* solubility */
+.mf-logs { display: flex; align-items: baseline; gap: 16px; }
+.mf-logs .k { font-size: 16px; color: var(--graphite); }
+.mf-logs .v { font-size: 28px; font-weight: 600; color: var(--ink); }
+.mf-logs .band { font-size: 20px; color: var(--ink); }
+
+/* toxicity table: hairline rules only */
+.mf-tox { width: 100%; border-collapse: collapse; font-size: 16px; border: 0 !important; }
+.mf-tox th, .mf-tox td { border: 0 !important; background: transparent !important; }
+.mf-tox th { text-align: left; font-weight: 400; font-size: 14px; color: var(--graphite);
+  border-bottom: 1px solid var(--ink) !important; padding: 4px 0; }
+.mf-tox td { border-bottom: 1px solid var(--grid) !important; padding: 5px 0; }
+.mf-tox td.p, .mf-tox th.p { text-align: right; font-variant-numeric: tabular-nums; }
+.mf-tox tr.sel td { color: var(--signal); font-weight: 700; }
+
+/* nearest neighbours */
+.mf-nn { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.mf-nn figure { margin: 0; }
+.mf-nn .pic { background: #fff; border: 1px solid var(--grid); }
+.mf-nn svg { width: 100%; height: auto; display: block; }
+.mf-nn figcaption { font-size: 14px; color: var(--graphite); margin-top: 4px; }
+
+.mf-error { color: var(--ink); border-left: 3px solid var(--sal-high); padding: 8px 12px;
+  background: #fff; font-size: 16px; }
+.mf-foot { margin-top: 28px; border-top: 1px solid var(--grid); padding-top: 10px;
+  font-size: 14px; color: var(--graphite); }
+
+@media (max-width: 640px) {
+  .mf-mol { min-height: 300px; }
+  .mf-nn { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

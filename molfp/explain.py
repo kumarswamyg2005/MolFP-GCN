@@ -43,9 +43,9 @@ def diverging(v):
     return tuple((1 - a) * np.ones(3) + a * end)
 
 
-def draw_svg(smiles, scores=None, size=(460, 400)):
+def draw_svg(smiles, scores=None, size=(460, 400), padding=0.12):
     """RDKit SVG of the molecule, atoms tinted by saliency if scores are given."""
-    return _draw(rdMolDraw2D.MolDraw2DSVG(*size), smiles, scores)
+    return _draw(rdMolDraw2D.MolDraw2DSVG(*size), smiles, scores, padding)
 
 
 def draw_png(smiles, scores=None, size=(460, 400)):
@@ -53,11 +53,11 @@ def draw_png(smiles, scores=None, size=(460, 400)):
     return _draw(rdMolDraw2D.MolDraw2DCairo(*size), smiles, scores)
 
 
-def _draw(d, smiles, scores):
+def _draw(d, smiles, scores, padding=0.12):
     mol, _ = parse_smiles(smiles)
     opts = d.drawOptions()
     opts.clearBackground = True
-    opts.padding = 0.12
+    opts.padding = padding
     opts.bondLineWidth = 2
     kwargs = {}
     if scores is not None:
