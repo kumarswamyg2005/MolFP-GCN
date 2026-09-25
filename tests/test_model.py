@@ -34,3 +34,9 @@ def test_permutation_invariance():
         a = m(Batch.from_data_list([mol_to_data(mol, s)]))
         b = m(Batch.from_data_list([mol_to_data(shuffled, s)]))
         assert (a - b).abs().max() < 1e-5
+
+
+def test_forward_on_graphs_without_bonds():
+    m = MolGCN(ATOM_DIM, 1).eval()
+    out = m(batch_of(["C", "[Na+].[Cl-]", "CCO"]))
+    assert out.shape == (3, 1) and torch.isfinite(out).all()

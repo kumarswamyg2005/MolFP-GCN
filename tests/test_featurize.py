@@ -2,7 +2,7 @@ import random
 
 import torch
 
-from molfp.featurize import ATOM_DIM, ELEMENTS, smiles_to_data
+from molfp.featurize import ATOM_DIM, BOND_DIM, ELEMENTS, smiles_to_data
 
 
 def test_benzene_graph():
@@ -42,3 +42,23 @@ def test_feature_dim_constant(need_data):
         assert d is not None
         assert d.x.shape[1] == ATOM_DIM
         assert d.edge_attr.shape[0] == d.edge_index.shape[1]
+
+
+def test_edge_cases():
+    salt = smiles_to_data("[Na+].[Cl-]")  # two fragments, no bonds
+    assert salt.num_nodes == 2 and salt.edge_index.shape == (2, 0)
+    assert salt.edge_attr.shape == (0, BOND_DIM)
+    single = smiles_to_data("C")
+    assert single.num_nodes == 1 and single.edge_index.shape == (2, 0)
+    boron = smiles_to_data("B(O)(O)O")
+    assert boron.x[0, len(ELEMENTS)] == 1  # boron -> "other" element slot
+    methane = smiles_to_data("C")
+    h_block = methane.x[0, 21:26]  # total H count one-hot: CH4 -> "4 or more"
+    assert h_block.tolist() == [0, 0, 0, 0, 1]
+
+
+def test_rows_are_valid_one_hots():
+    d = smiles_to_data("CC(=O)Oc1ccccc1C(=O)O")
+    for start, stop in [(0, 10), (10, 17), (17, 21), (21, 26), (26, 32)]:
+        assert torch.all(d.x[:, start:stop].sum(dim=1) == 1)
+    assert d.x.shape[1] == 35

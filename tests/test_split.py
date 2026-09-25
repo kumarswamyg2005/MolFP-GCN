@@ -1,6 +1,7 @@
 import json
 
 import pytest
+import torch
 
 from molfp import split as split_mod
 from molfp.data import load_dataset
@@ -50,3 +51,32 @@ def test_split_file_is_single_source_of_truth(need_data, tmp_path, monkeypatch):
     on_disk["hash"] = split_mod.index_hash(on_disk)
     path.write_text(json.dumps(on_disk))
     assert get_split("esol", seed=0)["test"] == on_disk["test"]
+
+
+@pytest.mark.parametrize("dataset", ["esol", "tox21"])
+def test_no_molecule_in_both_train_and_test(need_data, dataset):
+    from rdkit import Chem
+
+    smiles = load_dataset(dataset)[0]
+    s = get_split(dataset, 0)
+    canon = [Chem.MolToSmiles(Chem.MolFromSmiles(x)) for x in smiles]
+    train = {canon[i] for i in s["train"]}
+    assert not [canon[i] for i in s["test"] if canon[i] in train]
+
+
+def test_gcn_and_rf_use_same_split(need_data, tmp_path, monkeypatch):
+    from molfp.baseline import run_rf
+    from molfp.train import load_config, train
+
+    monkeypatch.setattr(split_mod, "SPLIT_DIR", tmp_path)
+    real = get_split("esol", 0)
+    # a deliberately odd but hash-consistent split: both models must follow it exactly
+    odd = {"train": real["train"][:200], "val": real["val"], "test": real["test"][:20]}
+    odd["hash"] = split_mod.index_hash(odd)
+    (tmp_path / "esol_seed0.json").write_text(json.dumps(odd))
+
+    rf = run_rf("esol", 0)
+    assert rf["test_idx"] == odd["test"] and rf["split_hash"] == odd["hash"]
+    cfg = load_config("configs/esol_gcn.yaml", max_epochs=1)
+    ckpt = torch.load(train(cfg, 0, root=tmp_path, verbose=False) / "best.pt", weights_only=False)
+    assert ckpt["split_hash"] == odd["hash"]

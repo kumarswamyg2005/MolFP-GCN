@@ -23,3 +23,17 @@
 | SR-HSE | 0.802 ± 0.013 | 0.703 ± 0.058 |
 | SR-MMP | 0.835 ± 0.013 | 0.773 ± 0.015 |
 | SR-p53 | 0.784 ± 0.011 | 0.726 ± 0.055 |
+
+**ESOL ablations** (GCN test RMSE, mean ± std; RF shown for the split ablation)
+
+| Variant | GCN RMSE | RF RMSE |
+|---|---|---|
+| depth 1 | 1.082 ± 0.204 | — |
+| depth 2 | 1.002 ± 0.135 | — |
+| depth 3 | 1.063 ± 0.163 | — |
+| depth 4 | 1.053 ± 0.156 | — |
+| readout mean | 0.985 ± 0.172 | — |
+| readout max | 1.046 ± 0.072 | — |
+| readout meanmax | 1.063 ± 0.163 | — |
+| split scaffold | 1.063 ± 0.163 | 1.694 ± 0.498 |
+| split random | 0.800 ± 0.023 | 1.256 ± 0.037 |
