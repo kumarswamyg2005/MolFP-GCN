@@ -83,7 +83,7 @@ def test_train_never_sees_test(need_data, tmp_path, monkeypatch):
     for graphs, name in [(clean, "a"), (scrambled, "b")]:
         monkeypatch.setattr(train_mod, "load_graphs", lambda _ds, g=graphs: g)
         out = train_mod.train(cfg, 0, root=tmp_path / name, verbose=False)
-        states.append(torch.load(out / "best.pt", weights_only=False))
+        states.append(torch.load(out / "best.pt", weights_only=True))
     assert states[0]["norm"] == states[1]["norm"]
     for k, v in states[0]["state_dict"].items():
         assert torch.equal(v, states[1]["state_dict"][k]), k

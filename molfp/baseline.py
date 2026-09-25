@@ -33,6 +33,7 @@ def run_rf(dataset, seed, split_kind="scaffold"):
     if dataset == "esol":
         rf = RandomForestRegressor(n_estimators=500, random_state=seed, n_jobs=-1)
         rf.fit(X[tr], y[tr, 0])
+        rf.n_jobs = 1  # parallel predict sums trees in thread order: last-digit float noise
         pred = rf.predict(X[te])[:, None]
         metrics = regression_metrics(y[te], pred)
     else:
@@ -41,11 +42,16 @@ def run_rf(dataset, seed, split_kind="scaffold"):
             lab = tr[~np.isnan(y[tr, t])]  # train only on rows labelled for this task
             rf = RandomForestClassifier(n_estimators=500, random_state=seed, n_jobs=-1)
             rf.fit(X[lab], y[lab, t])
+            rf.n_jobs = 1
             pred[:, t] = rf.predict_proba(X[te])[:, 1]
         metrics = masked_roc_auc(y[te], pred)
 
-    return {"metrics": metrics, "test_idx": te.tolist(), "test_pred": pred.tolist(),
-            "split_hash": split["hash"]}  # fmt: skip
+    return {
+        "metrics": metrics,
+        "test_idx": te.tolist(),
+        "test_pred": pred.tolist(),
+        "split_hash": split["hash"],
+    }
 
 
 if __name__ == "__main__":

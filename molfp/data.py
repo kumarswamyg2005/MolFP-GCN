@@ -12,12 +12,25 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
 
 TOX21_TASKS = [
-    "NR-AR", "NR-AR-LBD", "NR-AhR", "NR-Aromatase", "NR-ER", "NR-ER-LBD",
-    "NR-PPAR-gamma", "SR-ARE", "SR-ATAD5", "SR-HSE", "SR-MMP", "SR-p53",
-]  # fmt: skip
+    "NR-AR",
+    "NR-AR-LBD",
+    "NR-AhR",
+    "NR-Aromatase",
+    "NR-ER",
+    "NR-ER-LBD",
+    "NR-PPAR-gamma",
+    "SR-ARE",
+    "SR-ATAD5",
+    "SR-HSE",
+    "SR-MMP",
+    "SR-p53",
+]
 
 DATASETS = {
-    "esol": {"file": "delaney-processed.csv", "tasks": ["measured log solubility in mols per litre"]},
+    "esol": {
+        "file": "delaney-processed.csv",
+        "tasks": ["measured log solubility in mols per litre"],
+    },
     "tox21": {"file": "tox21.csv", "tasks": TOX21_TASKS},
 }
 

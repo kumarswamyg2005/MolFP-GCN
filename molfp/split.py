@@ -71,12 +71,16 @@ def get_split(dataset, seed, kind="scaffold"):
 
     Both the GCN and the RF baseline call this, so they always see the same indices.
     """
-    name = f"{dataset}_seed{seed}.json" if kind == "scaffold" else f"{dataset}_random_seed{seed}.json"
+    name = (
+        f"{dataset}_seed{seed}.json" if kind == "scaffold" else f"{dataset}_random_seed{seed}.json"
+    )
     path = SPLIT_DIR / name
     if path.exists():
         split = json.loads(path.read_text())
         if index_hash(split) != split["hash"]:
             raise ValueError(f"{path} was edited: stored hash does not match its indices")
+        if split["n"] != len(load_dataset(dataset)[0]):
+            raise ValueError(f"{path} was made for {split['n']} molecules; data has changed")
         return split
 
     smiles = load_dataset(dataset)[0]

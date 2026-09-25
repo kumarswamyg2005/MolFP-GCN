@@ -81,12 +81,19 @@ def load_models():
 
     # learned fingerprints of the ESOL seed-0 training molecules, for nearest neighbours
     smiles, y, _ = load_dataset("esol")
-    tr = get_split("esol", 0)["train"]
+    split = get_split("esol", 0)
+    if models["esol"][1]["split_hash"] != split["hash"]:
+        raise RuntimeError("ESOL checkpoint was trained on a different split; rerun `make train`")
+    tr = split["train"]
     graphs = load_graphs("esol")
     model = models["esol"][0]
     with torch.no_grad():
-        emb = torch.cat([model.embed(b.to(DEVICE)).cpu()
-                         for b in DataLoader([graphs[i] for i in tr], batch_size=256)])  # fmt: skip
+        emb = torch.cat(
+            [
+                model.embed(b.to(DEVICE)).cpu()
+                for b in DataLoader([graphs[i] for i in tr], batch_size=256)
+            ]
+        )
     emb = torch.nn.functional.normalize(emb, dim=1).numpy()
     return models, emb, [smiles[i] for i in tr], y[tr, 0]
 
@@ -94,13 +101,18 @@ def load_models():
 @st.cache_data
 def fonts_css():
     fonts = ROOT / "app" / "static" / "fonts"
-    faces = [("Atkinson Hyperlegible", 400, "atkinson-400"), ("Atkinson Hyperlegible", 700,
-             "atkinson-700"), ("IBM Plex Mono", 400, "plexmono-400")]  # fmt: skip
+    faces = [
+        ("Atkinson Hyperlegible", 400, "atkinson-400"),
+        ("Atkinson Hyperlegible", 700, "atkinson-700"),
+        ("IBM Plex Mono", 400, "plexmono-400"),
+    ]
     css = ""
     for family, weight, name in faces:
         b64 = base64.b64encode((fonts / f"{name}.woff2").read_bytes()).decode()
-        css += (f"@font-face{{font-family:'{family}';font-weight:{weight};font-display:swap;"
-                f"src:url(data:font/woff2;base64,{b64}) format('woff2');}}\n")  # fmt: skip
+        css += (
+            f"@font-face{{font-family:'{family}';font-weight:{weight};font-display:swap;"
+            f"src:url(data:font/woff2;base64,{b64}) format('woff2');}}\n"
+        )
     return css + (ROOT / "app" / "style.css").read_text()
 
 
@@ -122,10 +134,15 @@ def predict(mol, smiles, models):
 def render_drawing(smiles, scores):
     plain = svg_html(draw_svg(smiles))
     tinted = svg_html(draw_svg(smiles, scores))
-    st.markdown(f'<div class="mf-mol">{plain}<div class="mf-tint">{tinted}</div></div>',
-                unsafe_allow_html=True)  # fmt: skip
-    st.markdown('<div class="mf-cbar"><span>lowers prediction</span><div></div>'
-                "<span>raises prediction</span></div>", unsafe_allow_html=True)  # fmt: skip
+    st.markdown(
+        f'<div class="mf-mol">{plain}<div class="mf-tint">{tinted}</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="mf-cbar"><span>lowers prediction</span><div></div>'
+        "<span>raises prediction</span></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def tox_table(probs, selected):
@@ -134,8 +151,10 @@ def tox_table(probs, selected):
         f'<td class="p">{probs[i]:.2f}</td></tr>'
         for i in np.argsort(-probs)
     )
-    return (f'<table class="mf-tox"><thead><tr><th>Assay</th><th class="p">model probability'
-            f"</th></tr></thead><tbody>{rows}</tbody></table>")  # fmt: skip
+    return (
+        f'<table class="mf-tox"><thead><tr><th>Assay</th><th class="p">model probability'
+        f"</th></tr></thead><tbody>{rows}</tbody></table>"
+    )
 
 
 def neighbours_html(fp, emb, train_smiles, train_y):
@@ -143,8 +162,10 @@ def neighbours_html(fp, emb, train_smiles, train_y):
     cells = ""
     for i in np.argsort(-sims)[:3]:
         svg = svg_html(draw_svg(train_smiles[i], size=(240, 180), padding=0.04))
-        cells += (f'<figure><div class="pic">{svg}</div><figcaption>logS {train_y[i]:.2f}'
-                  f"<br>similarity {sims[i]:.2f}</figcaption></figure>")  # fmt: skip
+        cells += (
+            f'<figure><div class="pic">{svg}</div><figcaption>logS {train_y[i]:.2f}'
+            f"<br>similarity {sims[i]:.2f}</figcaption></figure>"
+        )
     return f'<div class="mf-nn">{cells}</div>'
 
 
@@ -182,8 +203,11 @@ def main():
     st.set_page_config(page_title="MolFP-GCN", layout="wide")
     st.markdown(f"<style>{fonts_css()}</style>", unsafe_allow_html=True)
     # a div, not <h1>: Streamlit restyles headings and adds anchor links to them
-    st.markdown('<div class="mf-head"><div class="mf-title">MolFP-GCN</div><span>Learned '
-                "molecular fingerprints</span></div>", unsafe_allow_html=True)  # fmt: skip
+    st.markdown(
+        '<div class="mf-head"><div class="mf-title">MolFP-GCN</div><span>Learned '
+        "molecular fingerprints</span></div>",
+        unsafe_allow_html=True,
+    )
 
     loaded = load_models()
     if loaded is None:
@@ -196,10 +220,17 @@ def main():
 
     left, right = st.columns([1.1, 1], gap="large")
     with left:
-        st.text_input("SMILES", key="smiles", max_chars=MAX_SMILES_CHARS,
-                      placeholder="CC(=O)Oc1ccccc1C(=O)O")  # fmt: skip
-        st.selectbox("or pick", list(PRESETS), index=None, placeholder="Choose a molecule",
-                     key="preset", on_change=on_preset)  # fmt: skip
+        st.text_input(
+            "SMILES", key="smiles", max_chars=MAX_SMILES_CHARS, placeholder="CC(=O)Oc1ccccc1C(=O)O"
+        )
+        st.selectbox(
+            "or pick",
+            list(PRESETS),
+            index=None,
+            placeholder="Choose a molecule",
+            key="preset",
+            on_change=on_preset,
+        )
         st.button("Predict", type="primary", on_click=on_predict)
 
     query = st.session_state.get("query", "")
@@ -224,8 +255,13 @@ def main():
         render_drawing(query, scores)
         c1, c2 = st.columns([1, 1.3])
         c1.radio("Explain", ["solubility", "toxicity"], key="explain")
-        c2.selectbox("Toxicity assay", TOX21_TASKS, key="task",
-                     index=TOX21_TASKS.index(task), disabled=target != "toxicity")  # fmt: skip
+        c2.selectbox(
+            "Toxicity assay",
+            TOX21_TASKS,
+            key="task",
+            index=TOX21_TASKS.index(task),
+            disabled=target != "toxicity",
+        )
 
     with right:
         st.markdown(
@@ -238,8 +274,7 @@ def main():
             + tox_table(probs, task if target == "toxicity" else None)
             + '<hr class="mf-rule"><p class="mf-label">Closest training molecules</p>'
             '<p class="mf-sub" style="margin-bottom:8px">by cosine similarity of the learned '
-            "fingerprint (ESOL model)</p>"
-            + neighbours_html(fp, emb, train_smiles, train_y),
+            "fingerprint (ESOL model)</p>" + neighbours_html(fp, emb, train_smiles, train_y),
             unsafe_allow_html=True,
         )
         with st.expander("How it works"):

@@ -126,7 +126,7 @@ def build_model(cfg, out_dim):
 
 
 def load_model(path):
-    ckpt = torch.load(path, map_location=DEVICE, weights_only=False)
+    ckpt = torch.load(path, map_location=DEVICE, weights_only=True)
     if ckpt["featurizer_version"] != FEATURIZER_VERSION:
         raise ValueError(f"{path} was trained with featurizer v{ckpt['featurizer_version']}")
     cfg = Config(**ckpt["config"])
@@ -152,9 +152,11 @@ def train(cfg, seed, root=RUNS, verbose=True):
     model = build_model(cfg, y_all.shape[1]).to(DEVICE)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     loader = DataLoader(
-        train_g, batch_size=cfg.batch_size, shuffle=True,
+        train_g,
+        batch_size=cfg.batch_size,
+        shuffle=True,
         generator=torch.Generator().manual_seed(seed),
-    )  # fmt: skip
+    )
 
     out = run_dir(cfg, seed, root)
     out.mkdir(parents=True, exist_ok=True)
@@ -193,8 +195,10 @@ def train(cfg, seed, root=RUNS, verbose=True):
             break
     log.close()
     if verbose:
-        print(f"[train] {cfg.dataset}/{cfg.name} seed {seed}: best {val_name} "
-              f"{abs(best):.4f} at epoch {best_epoch} -> {out / 'best.pt'}")  # fmt: skip
+        print(
+            f"[train] {cfg.dataset}/{cfg.name} seed {seed}: best {val_name} "
+            f"{abs(best):.4f} at epoch {best_epoch} -> {out / 'best.pt'}"
+        )
     return out
 
 

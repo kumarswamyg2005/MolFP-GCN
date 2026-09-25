@@ -4,7 +4,7 @@ SEEDS := 0 1 2
 .PHONY: setup data train eval figures test lint demo ablations all clean
 
 setup:
-	uv venv --python 3.11 .venv
+	test -d .venv || uv venv --python 3.11 .venv
 	uv pip install --python $(PY) -r requirements.lock
 
 data:

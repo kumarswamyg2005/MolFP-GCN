@@ -19,5 +19,7 @@ for i in get_split("tox21", 0)["test"]:
         cands.append((-np.nansum(y[i]), heavy, i))
 _, heavy, i = min(cands)
 active = [t for t, v in zip(tasks, y[i], strict=True) if v == 1]
-print(f"{smiles[i]}\nrow {i}, {heavy} heavy atoms, active in {len(active)} of "
-      f"{int((~np.isnan(y[i])).sum())} labelled assays: {', '.join(active)}")  # fmt: skip
+print(
+    f"{smiles[i]}\nrow {i}, {heavy} heavy atoms, active in {len(active)} of "
+    f"{int((~np.isnan(y[i])).sum())} labelled assays: {', '.join(active)}"
+)

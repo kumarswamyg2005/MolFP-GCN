@@ -47,6 +47,12 @@ def test_split_file_is_single_source_of_truth(need_data, tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         get_split("esol", seed=0)
 
+    # a split made for a different dataset size is rejected
+    stale = {**on_disk, "n": on_disk["n"] + 1, "hash": split_mod.index_hash(on_disk)}
+    path.write_text(json.dumps(stale))
+    with pytest.raises(ValueError, match="data has changed"):
+        get_split("esol", seed=0)
+
     # with a consistent hash, the file wins over recomputation (proves it is read, not rebuilt)
     on_disk["hash"] = split_mod.index_hash(on_disk)
     path.write_text(json.dumps(on_disk))
@@ -71,12 +77,17 @@ def test_gcn_and_rf_use_same_split(need_data, tmp_path, monkeypatch):
     monkeypatch.setattr(split_mod, "SPLIT_DIR", tmp_path)
     real = get_split("esol", 0)
     # a deliberately odd but hash-consistent split: both models must follow it exactly
-    odd = {"train": real["train"][:200], "val": real["val"], "test": real["test"][:20]}
+    odd = {
+        "train": real["train"][:200],
+        "val": real["val"],
+        "test": real["test"][:20],
+        "n": real["n"],
+    }
     odd["hash"] = split_mod.index_hash(odd)
     (tmp_path / "esol_seed0.json").write_text(json.dumps(odd))
 
     rf = run_rf("esol", 0)
     assert rf["test_idx"] == odd["test"] and rf["split_hash"] == odd["hash"]
     cfg = load_config("configs/esol_gcn.yaml", max_epochs=1)
-    ckpt = torch.load(train(cfg, 0, root=tmp_path, verbose=False) / "best.pt", weights_only=False)
+    ckpt = torch.load(train(cfg, 0, root=tmp_path, verbose=False) / "best.pt", weights_only=True)
     assert ckpt["split_hash"] == odd["hash"]

@@ -30,7 +30,8 @@ MAIN_CONFIG = {"esol": "configs/esol_gcn.yaml", "tox21": "configs/tox21_gcn.yaml
 def run_gcn(cfg, seed):
     split = get_split(cfg.dataset, seed, cfg.split)
     ckpt_path = run_dir(cfg, seed) / "best.pt"
-    if ckpt_path.exists() and torch.load(ckpt_path, weights_only=False)["split_hash"] == split["hash"]:
+    old = torch.load(ckpt_path, weights_only=True) if ckpt_path.exists() else None
+    if old and old["split_hash"] == split["hash"] and old["config"] == asdict(cfg):
         print(f"[eval] reusing {ckpt_path}")
     else:
         train(cfg, seed)
@@ -41,8 +42,13 @@ def run_gcn(cfg, seed):
     pred = predict(model, [graphs[i] for i in te], ckpt["norm"])
     y = load_dataset(cfg.dataset)[1]
     metrics, _ = score(cfg.dataset, y[te], pred)
-    return {"metrics": metrics, "test_idx": te, "test_pred": pred.tolist(),
-            "best_epoch": ckpt["epoch"], "split_hash": split["hash"]}  # fmt: skip
+    return {
+        "metrics": metrics,
+        "test_idx": te,
+        "test_pred": pred.tolist(),
+        "best_epoch": ckpt["epoch"],
+        "split_hash": split["hash"],
+    }
 
 
 def summarize(runs):
@@ -50,16 +56,23 @@ def summarize(runs):
     out = {}
     for key in runs[0]["metrics"]:
         vals = np.array([r["metrics"][key] for r in runs], dtype=float)
-        out[key] = {"mean": np.nanmean(vals, axis=0).tolist(),
-                    "std": np.nanstd(vals, axis=0, ddof=1).tolist()}  # fmt: skip
+        out[key] = {
+            "mean": np.nanmean(vals, axis=0).tolist(),
+            "std": np.nanstd(vals, axis=0, ddof=1).tolist(),
+        }
     return out
 
 
 def evaluate_dataset(dataset):
     cfg = load_config(MAIN_CONFIG[dataset])
     smiles, y, tasks = load_dataset(dataset)
-    result = {"dataset": dataset, "split": cfg.split, "seeds": list(SEEDS), "tasks": tasks,
-              "config": asdict(cfg)}  # fmt: skip
+    result = {
+        "dataset": dataset,
+        "split": cfg.split,
+        "seeds": list(SEEDS),
+        "tasks": tasks,
+        "config": asdict(cfg),
+    }
     for name, fn in [("gcn", lambda s: run_gcn(cfg, s)), ("rf", lambda s: run_rf(dataset, s))]:
         runs = []
         for seed in SEEDS:
@@ -67,8 +80,9 @@ def evaluate_dataset(dataset):
             r = fn(seed)
             runs.append({"seed": seed, **r})
         result[name] = {"summary": summarize(runs), "per_seed": runs}
-    for seed_runs in zip(result["gcn"]["per_seed"], result["rf"]["per_seed"], strict=True):
-        assert seed_runs[0]["split_hash"] == seed_runs[1]["split_hash"]  # invariant 8
+    for g, r in zip(result["gcn"]["per_seed"], result["rf"]["per_seed"], strict=True):
+        if g["split_hash"] != r["split_hash"]:  # invariant 8
+            raise RuntimeError(f"seed {g['seed']}: GCN and RF used different splits")
     # true test targets per seed, so figures never need to reload data
     for r in result["gcn"]["per_seed"]:
         r["test_true"] = y[r["test_idx"]].tolist()
@@ -88,8 +102,11 @@ def evaluate_ablations(path="configs/esol_ablations.yaml"):
         for seed in SEEDS:
             print(f"[ablation] {variant} seed {seed}")
             runs.append({"seed": seed, **run_gcn(cfg, seed)})
-        entry = {"overrides": overrides, "gcn": summarize(runs),
-                 "gcn_per_seed": [{"seed": r["seed"], **r["metrics"]} for r in runs]}  # fmt: skip
+        entry = {
+            "overrides": overrides,
+            "gcn": summarize(runs),
+            "gcn_per_seed": [{"seed": r["seed"], **r["metrics"]} for r in runs],
+        }
         if "split" in overrides:  # the RF on the same split shows the gap is not GCN-specific
             rf = [{"seed": s, **run_rf(base.dataset, s, cfg.split)} for s in SEEDS]
             entry["rf"] = summarize(rf)
@@ -109,8 +126,10 @@ def print_summary(result):
     keys = ["rmse", "mae", "r2"] if result["dataset"] == "esol" else ["roc_auc"]
     for model in ("gcn", "rf"):
         s = result[model]["summary"]
-        print(f"  {model.upper():4s} " + "  ".join(
-            f"{k} {s[k]['mean']:.3f} ± {s[k]['std']:.3f}" for k in keys))  # fmt: skip
+        print(
+            f"  {model.upper():4s} "
+            + "  ".join(f"{k} {s[k]['mean']:.3f} ± {s[k]['std']:.3f}" for k in keys)
+        )
 
 
 if __name__ == "__main__":
