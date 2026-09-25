@@ -1,0 +1,13 @@
+# Tox21 toxicity (12 tasks), GCN. Every field maps to molfp.train.Config.
+dataset: tox21
+name: gcn
+split: scaffold
+hidden: 128
+layers: 3
+dropout: 0.2
+readout: meanmax
+lr: 0.001
+weight_decay: 0.00001
+batch_size: 64
+max_epochs: 300
+patience: 30

@@ -1,0 +1,12 @@
+# ESOL ablations: each variant = esol_gcn.yaml + these overrides, run for seeds 0, 1, 2.
+base: configs/esol_gcn.yaml
+variants:
+  depth_1: {layers: 1}
+  depth_2: {layers: 2}
+  depth_3: {layers: 3}
+  depth_4: {layers: 4}
+  readout_mean: {readout: mean}
+  readout_max: {readout: max}
+  readout_meanmax: {readout: meanmax}
+  split_scaffold: {split: scaffold}
+  split_random: {split: random}
