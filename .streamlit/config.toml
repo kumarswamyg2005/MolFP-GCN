@@ -11,3 +11,6 @@ toolbarMode = "minimal"
 
 [browser]
 gatherUsageStats = false
+
+[server]
+showEmailPrompt = false  # first-run prompt blocks `make demo` on a fresh machine
