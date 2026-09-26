@@ -51,9 +51,9 @@ fingerprint toward whatever the task needs. That's the "differentiable" part.
 After L layers an atom's vector includes atoms up to L bonds away. ECFP4 has radius 2, so it
 sees 2 bonds. Three layers see one bond further, which is in the same range. With many layers
 every atom ends up averaging over nearly the whole molecule, so all atom vectors look alike.
-This is **over-smoothing**, and max pooling then has nothing to pick out. In my depth
+This is **over-smoothing**, and max pooling then has nothing to pick out. In our depth
 ablation, 1–4 layers were all within noise (1.08 ± 0.20, 1.00 ± 0.14,
-1.06 ± 0.16, 1.05 ± 0.16). I didn't see over-smoothing at 4 layers. The residual
+1.06 ± 0.16, 1.05 ± 0.16). We didn't see over-smoothing at 4 layers. The residual
 connections probably help, and ESOL is too small to separate these settings.
 
 ### 4. Why a scaffold split? What did the random-split ablation show?
@@ -95,7 +95,7 @@ contribute the same. Fixes:
   bond features, e.g. m_ij = MLP([h_j, e_ij]).
 - **GAT / GATv2:** learns an attention weight per edge, so neighbours can matter unequally;
   with `edge_dim` the bond features feed into that weight.
-My featurizer already stores bond type, conjugation and ring membership in `edge_attr`, so
+Our featurizer already stores bond type, conjugation and ring membership in `edge_attr`, so
 this would be a change to `model.py` only.
 
 ### 8. What does the saliency map show? When can it mislead?
@@ -129,7 +129,7 @@ the honest result on a fixed protocol is the point.
   them).
 - Early stopping uses validation only. The strongest test scrambles every test molecule's
   features and labels to garbage, retrains, and asserts the weights are **bit-identical**.
-  If the test set were used anywhere in training, they would differ. I checked the test
+  If the test set were used anywhere in training, they would differ. We checked the test
   itself by scrambling training molecules instead, and then it fails as it should.
 - GCN and RF read the same hashed split file; evaluation raises an error if their hashes
   differ.
@@ -141,7 +141,7 @@ the honest result on a fixed protocol is the point.
 | GCN (learned fingerprint) | 1.063 ± 0.163 | 0.856 ± 0.124 | 0.709 ± 0.048 | 0.811 ± 0.009 |
 | ECFP4 + random forest | 1.694 ± 0.498 | 1.287 ± 0.378 | 0.267 ± 0.248 | 0.756 ± 0.015 |
 
-Tox21 scored 0.811 ± 0.009, slightly above my expected band. My explanation: my
+Tox21 scored 0.811 ± 0.009, slightly above our expected band. Our explanation: our
 balanced scaffold split samples test scaffolds at random, which is easier than DeepChem's
 "rarest scaffolds go to test" split, so don't compare it directly with papers.
 

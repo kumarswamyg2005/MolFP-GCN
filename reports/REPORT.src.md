@@ -1,6 +1,12 @@
 # Learned molecular fingerprints with a graph convolutional network
 
-**Gurram Naga Kumaraswamy** · Roll no. `<ROLL NO>` · `<COURSE NAME AND CODE>` · 2026
+| Name | Roll no. |
+|---|---|
+| Gurram Naga Kumaraswamy | S20230010101 |
+| Simon Peter | S20230010171 |
+| Rakesh | S20230010196 |
+
+Course: `<COURSE NAME AND CODE>` · 2026
 
 All numbers in this report are filled in by `python -m molfp.figures` from `results/*.json`.
 None are typed by hand. Every result is the mean ± sample standard deviation over seeds
@@ -19,7 +25,7 @@ After a few layers the atom vectors are pooled into one molecule vector, and the
 is trained end to end, so the "fingerprint" ends up shaped by the task. Duvenaud et al. (2015)
 called this a differentiable fingerprint.
 
-I wanted to test two things on public data. First, does the learned fingerprint actually beat
+We wanted to test two things on public data. First, does the learned fingerprint actually beat
 ECFP + random forest when both get the same molecules and the same honest split? Second, can
 the model point at the atoms behind a prediction?
 
@@ -101,10 +107,10 @@ extrapolate a little. On seeds 0 and 2, which are more typical, the forest score
 
 ![ESOL parity plots](figures/parity_esol.png)
 
-Two results fall outside the sanity bands I set before training. The ESOL forest (RMSE
+Two results fall outside the sanity bands we set before training. The ESOL forest (RMSE
 {{esol_rf_rmse}}) is above the expected 0.9–1.4, for the reason above. The Tox21 GCN (ROC-AUC
-{{tox_gcn_auc}}) is slightly above the expected 0.68–0.80. I checked for duplicates between
-train and test and found none. My best explanation is the split variant. DeepChem's
+{{tox_gcn_auc}}) is slightly above the expected 0.68–0.80. We checked for duplicates between
+train and test and found none. Our best explanation is the split variant. DeepChem's
 deterministic scaffold split sends the rarest scaffolds to test, while this one sends the
 large groups to train and samples the test set from the remaining small groups at random.
 That is likely an easier test set than the one behind most published Tox21 scaffold numbers,
@@ -125,13 +131,13 @@ epoch to epoch (the seed-0 validation set has {{esol_val_n}} molecules), and the
 {{table_ablations}}
 
 **Depth.** One to four layers give {{abl_depth_1}}, {{abl_depth_2}}, {{abl_depth_3}} and
-{{abl_depth_4}}. Every difference is well inside one standard deviation. I can't claim that
-three layers is best, or that depth matters at all at this dataset size. I expected
+{{abl_depth_4}}. Every difference is well inside one standard deviation. We can't claim that
+three layers is best, or that depth matters at all at this dataset size. We expected
 over-smoothing to hurt at four layers and did not see it, possibly because of the residual
 connections.
 
 **Readout.** Mean, max and mean+max give {{abl_readout_mean}}, {{abl_readout_max}} and
-{{abl_readout_meanmax}}. Again no clear winner. I kept mean+max because it was the planned
+{{abl_readout_meanmax}}. Again no clear winner. We kept mean+max because it was the planned
 default, not because the ablation favoured it.
 
 **Split.** This is the one clear effect. With a random split the GCN reaches
@@ -148,7 +154,7 @@ The t-SNE plots show the ESOL test molecules under each representation, coloured
 solubility. ECFP groups molecules by shared substructures, and solubility is mixed within its
 clusters. In the learned fingerprint the least soluble molecules form their own group and the
 colour changes more smoothly across the map. t-SNE distorts distances and depends on its
-random seed, so I read this as a picture that agrees with the numbers, not as evidence on its
+random seed, so we read this as a picture that agrees with the numbers, not as evidence on its
 own.
 
 **Saliency.** For a prediction *o* and atom features *X*, each atom gets the score
@@ -161,7 +167,7 @@ On ESOL the maps are mostly chemically sensible. Carbonyl and hydroxyl oxygens r
 solubility, while aromatic and chlorinated carbon cores lower it. The maps have limits. A
 gradient describes a tiny change to the features, not what happens if an atom is removed.
 Message passing also spreads credit onto neighbours, so a highlighted carbon may be
-highlighted because of the oxygen next to it. I treat saliency as a hint about what the model
+highlighted because of the oxygen next to it. We treat saliency as a hint about what the model
 used, not as a chemical explanation.
 
 ## 7. Limitations

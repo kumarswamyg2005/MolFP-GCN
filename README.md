@@ -1,11 +1,17 @@
 # MolFP-GCN
 
-**Gurram Naga Kumaraswamy** · Roll no. `<ROLL NO>` · `<COURSE NAME AND CODE>`
+| Name | Roll no. |
+|---|---|
+| Gurram Naga Kumaraswamy | S20230010101 |
+| Simon Peter | S20230010171 |
+| Rakesh | S20230010196 |
+
+Course: `<COURSE NAME AND CODE>`
 
 A fixed fingerprint like ECFP describes a molecule the same way whatever you want to predict.
 This project trains a graph convolutional network that learns its own fingerprint instead,
 with atoms as nodes and bonds as edges, and compares it with ECFP + random forest on the same
-scaffold splits. I used two MoleculeNet tasks: ESOL solubility (regression) and Tox21 (12
+scaffold splits. We used two MoleculeNet tasks: ESOL solubility (regression) and Tox21 (12
 toxicity assays). The GCN came out ahead on both, though the ESOL margin depends a lot on
 which scaffolds end up in the test set (see the report). A small Streamlit app draws a
 molecule, predicts both properties, and colours the atoms that pushed each prediction up or
