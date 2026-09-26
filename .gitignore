@@ -12,3 +12,7 @@ data/*
 
 # training outputs (checkpoints, logs)
 runs/
+
+# skill symlinks Streamlit creates on `streamlit run`; they point into .venv
+.agents/
+.claude/skills/

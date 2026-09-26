@@ -31,6 +31,7 @@ by `python -m molfp.figures` from `results/*.json`.
 | ECFP4 + random forest | 1.694 ± 0.498 | 1.287 ± 0.378 | 0.267 ± 0.248 | 0.756 ± 0.015 |
 <!-- results:end -->
 
+New to the project? Start with [docs/PROJECT_IN_SIMPLE_WORDS.md](docs/PROJECT_IN_SIMPLE_WORDS.md).
 Full write-up: [reports/REPORT.md](reports/REPORT.md). Viva notes: [docs/EXPLAIN.md](docs/EXPLAIN.md).
 
 ## Reproduce
@@ -61,7 +62,7 @@ tests/        pytest suite, one file per module
 data/         CHECKSUMS.txt and splits/ are committed; raw CSVs are downloaded
 results/      esol.json, tox21.json, ablations.json
 reports/      REPORT.md (generated from REPORT.src.md), figures/
-docs/         ARCHITECTURE.md, adr/, EXPLAIN.md, DESIGN.md
+docs/         PROJECT_IN_SIMPLE_WORDS.md, ARCHITECTURE.md, adr/, EXPLAIN.md, DESIGN.md
 ```
 
 ## Known limitations

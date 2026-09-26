@@ -378,7 +378,11 @@ def doc_values(esol, tox, abl, blocks):
     return v
 
 
-DOCS = [("reports/REPORT.src.md", "reports/REPORT.md"), ("docs/EXPLAIN.src.md", "docs/EXPLAIN.md")]
+DOCS = [
+    ("reports/REPORT.src.md", "reports/REPORT.md"),
+    ("docs/EXPLAIN.src.md", "docs/EXPLAIN.md"),
+    ("docs/PROJECT_IN_SIMPLE_WORDS.src.md", "docs/PROJECT_IN_SIMPLE_WORDS.md"),
+]
 
 
 def render_docs(values):
