@@ -1,0 +1,259 @@
+<title>MolFP-GCN Study Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: one calm reading column; a sticky chip row jumps to each person's part. */
+:root{--bg:#f6f8f8;--card:#fff;--fg:#17262b;--mut:#51666d;--line:#d8e1e3;--acc:#0a6b73;--accbg:#e1f1f2;--good:#1b7a3d;--warn:#9a5b00;--warnbg:#fdf0d8;--font:'Atkinson Hyperlegible',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101a1d;--card:#172428;--fg:#e8f0f1;--mut:#9fb3b8;--line:#2a3b40;--acc:#5fd0d8;--accbg:#173a3f;--good:#6fd68f;--warn:#f0b25a;--warnbg:#3a2d12;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101a1d;--card:#172428;--fg:#e8f0f1;--mut:#9fb3b8;--line:#2a3b40;--acc:#5fd0d8;--accbg:#173a3f;--good:#6fd68f;--warn:#f0b25a;--warnbg:#3a2d12;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:18px/1.7 var(--font);padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:0 64px;margin:0}
+.wrap{max-width:760px;margin:auto}
+h1,h2,h3{line-height:1.25;text-wrap:balance}
+h1{font-size:2rem;margin:32px 0 8px}
+h2{font-size:1.5rem;margin:0 0 12px}
+h3{font-size:1.1rem;margin:22px 0 6px}
+p{margin:0 0 14px}
+.lead{font-size:1.15rem;color:var(--mut)}
+nav{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:10px 0;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid var(--line);z-index:5}
+nav a{white-space:nowrap;padding:6px 14px;border-radius:99px;border:1px solid var(--line);color:var(--fg);text-decoration:none;font-size:.95rem;background:var(--card)}
+nav a:hover,nav a:focus-visible{border-color:var(--acc);outline:2px solid var(--acc);outline-offset:1px}
+section{margin-top:48px;scroll-margin-top:64px}
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:18px 0}
+.team div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.team b{display:block}.team span{color:var(--mut);font-size:.9rem}
+.say{background:var(--accbg);border-radius:10px;padding:14px 16px;margin:16px 0}
+.say b{display:block;color:var(--acc);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.steps{list-style:none;padding:0;margin:14px 0;display:grid;gap:10px}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.steps b{display:block}
+.tablewrap{overflow-x:auto;margin:14px 0}
+table{border-collapse:collapse;width:100%;min-width:480px;background:var(--card)}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+th{background:var(--accbg)}
+td.w{color:var(--good);font-weight:700}
+figure{margin:18px 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+figure img{width:100%;height:auto;display:block;border-radius:6px}
+figcaption{color:var(--mut);font-size:.92rem;margin-top:8px}
+details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0}
+summary{cursor:pointer;font-weight:700}
+details p{margin:8px 0 2px}
+.watch{background:var(--warnbg);border-radius:10px;padding:12px 16px;margin:16px 0}
+.watch b{color:var(--warn)}
+ul{padding-left:1.2em;margin:0 0 14px}li{margin-bottom:6px}
+code{background:var(--accbg);padding:1px 6px;border-radius:4px;font-size:.9em}
+.who{display:inline-block;background:var(--acc);color:var(--bg);border-radius:6px;padding:2px 10px;font-size:.85rem;font-weight:700;margin-bottom:8px}
+footer{margin-top:56px;color:var(--mut);font-size:.9rem}
+</style>
+
+<div class="wrap">
+<h1>MolFP-GCN Study Guide</h1>
+<p class="lead">A plain-words guide to our project, split into three parts so each of us can explain our own part with confidence.</p>
+<div class="team">
+  <div><b>Kumaraswamy</b><span>S20230010101 · The model</span></div>
+  <div><b>Simon Peter</b><span>S20230010171 · Data and training</span></div>
+  <div><b>Rakesh</b><span>S20230010196 · Baseline, tests and demo</span></div>
+</div>
+</div>
+
+<nav><div class="wrap" style="display:flex;gap:8px">
+<a href="#idea">The idea</a><a href="#results">Results</a><a href="#kumar">Kumaraswamy</a><a href="#simon">Simon</a><a href="#rakesh">Rakesh</a><a href="#words">Words</a>
+</div></nav>
+
+<div class="wrap">
+
+<section id="idea">
+<h2>The idea in 30 seconds</h2>
+<p>Computers cannot read a molecule. We have to turn it into numbers first. The numbers are called a <b>fingerprint</b>.</p>
+<p>The old way, <b>ECFP</b>, uses a fixed recipe. The same molecule always gets the same fingerprint, whatever you want to predict.</p>
+<p>Our way uses a <b>graph neural network (GCN)</b>. It treats the molecule as a drawing: atoms are dots, bonds are lines. It learns its own fingerprint, shaped by the task.</p>
+<div class="say"><b>Say this in the viva</b>We built a network that learns its own molecular fingerprint, and checked fairly whether it beats the fixed ECFP fingerprint with a random forest.</div>
+<h3>The two problems we tested</h3>
+<ul>
+<li><b>ESOL:</b> 1,128 molecules. Predict how well each dissolves in water (a number called logS).</li>
+<li><b>Tox21:</b> 7,823 molecules. Predict 12 yes/no toxicity tests for each one.</li>
+</ul>
+<h3>The whole project in 5 steps</h3>
+<ol class="steps">
+<li><b>1. Download the data</b>Checked with a checksum so nobody can change it by accident.</li>
+<li><b>2. Turn each molecule into a graph</b>Each atom gets 35 numbers describing it. (Kumaraswamy)</li>
+<li><b>3. Split the data fairly</b>Whole families of similar molecules stay together. (Simon)</li>
+<li><b>4. Train the GCN and the random forest</b>Same split, three random seeds, so the comparison is fair. (Simon, Rakesh)</li>
+<li><b>5. Measure and explain</b>Score on molecules never seen, and colour the atoms that drove each prediction. (Kumaraswamy, Rakesh)</li>
+</ol>
+</section>
+
+<section id="results">
+<h2>Results</h2>
+<p>Scores on the test set, as mean over 3 seeds. The test set holds molecules the models never saw.</p>
+<div class="tablewrap"><table>
+<tr><th>Model</th><th>ESOL error (lower is better)</th><th>Tox21 score (higher is better)</th></tr>
+<tr><td><b>GCN (ours)</b></td><td class="w">1.063</td><td class="w">0.811</td></tr>
+<tr><td>ECFP + random forest</td><td>1.694</td><td>0.756</td></tr>
+</table></div>
+<ul>
+<li>The GCN wins on both problems.</li>
+<li>On Tox21 it is ahead on 11 of the 12 tests. The random forest wins only <code>SR-ARE</code>.</li>
+</ul>
+<div class="watch"><b>Say this before they ask:</b> The ESOL gap looks bigger than it is. In seed 1, a family of PCB molecules (very hard to dissolve) all landed in the test set. The forest scored an error of 2.25 there; the GCN scored 1.23. The GCN still wins every seed, but the margin is smaller on the other two.</div>
+<div class="watch"><b>Also say:</b> Our Tox21 split is probably easier than the one in published papers, so do not compare our 0.811 directly with their numbers.</div>
+</section>
+
+<section id="kumar">
+<span class="who">Kumaraswamy</span>
+<h2>The model: how the GCN thinks</h2>
+<div class="say"><b>Your one line</b>Each atom repeatedly asks its neighbours what they know, and the molecule ends up as 256 learned numbers.</div>
+
+<h3>Step 1. Molecule to graph</h3>
+<p>A text code for the molecule (called SMILES) is read by a chemistry library. Every atom becomes a dot with <b>35 numbers</b>: which element, how many bonds, charge, hydrogens, shape, whether it is in a ring, and its weight. Every bond becomes two arrows, one each way.</p>
+<p>If a code is invalid, our parser returns a friendly reason. It never crashes.</p>
+
+<h3>Step 2. Talking to neighbours</h3>
+<p>Picture people in a room. Each person asks their neighbours what they know, averages it with their own view, and updates. We do this <b>3 times</b>. After 3 rounds each atom knows about atoms up to 3 bonds away.</p>
+<p>The averaging is balanced by how many bonds an atom has, so a busy carbon does not shout louder than a lonely oxygen.</p>
+
+<h3>Step 3. One fingerprint per molecule</h3>
+<p>Atoms have no natural order, so we combine them in an order-free way: the <b>average</b> of all atoms plus the <b>maximum</b> of all atoms. Together that is <b>256 numbers: the learned fingerprint</b>. A small network on top turns it into the answer. Total size is about 88,000 weights, small enough for a laptop.</p>
+
+<figure><img src="img/tsne_pair.png" alt="t-SNE map of learned fingerprints" loading="lazy"><figcaption>The learned fingerprints drawn on a 2D map. Molecules with similar properties end up near each other.</figcaption></figure>
+
+<h3>Which atoms mattered? (saliency)</h3>
+<p>We ask: if this atom's numbers changed a little, how much would the answer move? We colour the result. <b>Red</b> pushes the prediction up. <b>Blue</b> pushes it down. <b>White</b> barely matters.</p>
+<figure><img src="img/saliency_examples.png" alt="Saliency colouring on example molecules" loading="lazy"><figcaption>Water-loving oxygens tend to be red for solubility. Greasy rings and chlorines tend to be blue.</figcaption></figure>
+<div class="watch"><b>Be honest:</b> saliency shows what the model used, not proven chemistry. The model may have found a shortcut.</div>
+
+<h3>Questions you may get</h3>
+<details><summary>Why 3 layers?</summary><p>ECFP4 sees 2 bonds away. Three layers see one bond further. We also tried 1, 2 and 4 layers. All scored about the same (see Rakesh's section).</p></details>
+<details><summary>What is the weakness of GCN?</summary><p>It ignores bond types. A double bond C=O and a single bond C–O look the same to it. We already store bond information, so a future edge-aware layer (GINE, D-MPNN) would only change <code>model.py</code>.</p></details>
+<details><summary>What is a residual connection?</summary><p>From layer 2 on, a layer adds its result to its input instead of replacing it. This keeps training stable and helps stop every atom looking the same.</p></details>
+<details><summary>Why mean and max both?</summary><p>Mean says what the molecule is made of overall. Max catches one standout group, like a single nitro group that can decide toxicity.</p></details>
+<details><summary>What is over-smoothing?</summary><p>With too many rounds, every atom averages in nearly the whole molecule and they all look alike. We did not see it up to 4 layers.</p></details>
+</section>
+
+<section id="simon">
+<span class="who">Simon Peter</span>
+<h2>Data, fair splitting and training</h2>
+<div class="say"><b>Your one line</b>We made the test as hard and honest as possible, then trained both models the same way, so the numbers can be trusted.</div>
+
+<h3>The data</h3>
+<ul>
+<li>Both datasets come from the MoleculeNet collection. The download script checks a checksum and refuses to continue if a file changed.</li>
+<li>Tox21 had 7,831 rows. RDKit could not read 8 of them, so we dropped those and logged it. That leaves 7,823.</li>
+<li>About 17% of Tox21 answers are missing, and only 7.5% of known answers are "toxic".</li>
+</ul>
+
+<h3>The scaffold split (the most important idea)</h3>
+<p>A <b>scaffold</b> is a molecule's core ring skeleton. Many molecules in a dataset are near-twins sharing a scaffold. If one twin is in training and the other in the test, the model can just remember the answer.</p>
+<p>So we put every scaffold family entirely in one place: <b>80% train, 10% validation, 10% test</b>. A test checks that no scaffold appears in two places.</p>
+<figure><img src="img/ablations_esol.png" alt="Scaffold versus random split results" loading="lazy"><figcaption>With a random split the GCN error looks like 0.80. With the honest scaffold split it is 1.06. The difference is leakage, not skill.</figcaption></figure>
+<p>Both models read the same saved split file, and the evaluation code checks they used identical data.</p>
+
+<h3>Training, step by step</h3>
+<ol class="steps">
+<li><b>Settings in a file</b>Learning rate 0.001, batches of 64, up to 300 rounds. Both datasets use the same settings.</li>
+<li><b>Each round (epoch)</b>The model guesses, we measure the mistake, the optimiser (Adam) nudges the weights.</li>
+<li><b>Check on the validation set</b>This is a separate set used only to pick the best round.</li>
+<li><b>Early stopping</b>If there is no improvement for 30 rounds, stop and keep the best saved model.</li>
+</ol>
+<figure><img src="img/training_curves.png" alt="Training and validation curves" loading="lazy"><figcaption>Error falls, then validation stops improving. Early stopping keeps the best point.</figcaption></figure>
+
+<h3>Two losses (how the model is told it is wrong)</h3>
+<ul>
+<li><b>ESOL:</b> mean squared error on the solubility number.</li>
+<li><b>Tox21:</b> binary cross-entropy that <b>skips missing answers</b> (never treats them as zero) and <b>gives rare toxic examples more weight</b>.</li>
+</ul>
+
+<h3>How we measure</h3>
+<ul>
+<li><b>RMSE:</b> typical size of the error in solubility units. Lower is better.</li>
+<li><b>R²:</b> how much of the variation we explain. 1 is perfect, 0 is no better than guessing the average.</li>
+<li><b>ROC-AUC:</b> pick one toxic and one safe molecule at random. How often does the model rank the toxic one higher? 0.5 is a coin flip, 1.0 is perfect.</li>
+</ul>
+<figure><img src="img/parity_esol.png" alt="Predicted versus measured solubility" loading="lazy"><figcaption>Predicted against measured solubility. Dots near the diagonal are good predictions.</figcaption></figure>
+<figure><img src="img/tox21_per_task.png" alt="Tox21 score per assay" loading="lazy"><figcaption>Score for each of the 12 toxicity tests. The GCN is ahead on 11.</figcaption></figure>
+
+<h3>Why you can trust it (reproducibility)</h3>
+<ul>
+<li>Random seeds 0, 1 and 2 control the split and the model start, and we report mean ± spread.</li>
+<li>A test scrambles the test molecules and retrains. The trained weights come out identical, which proves the test set is never used in training.</li>
+<li>Numbers used to scale targets come from the training set only.</li>
+<li>Every number in the report is filled in automatically from the results files.</li>
+<li>A fresh clone runs end to end with <code>make all</code> in 11 minutes on a laptop and gives identical results.</li>
+</ul>
+
+<h3>Questions you may get</h3>
+<details><summary>Why is the ESOL result so variable?</summary><p>ESOL has only about 1,100 molecules, so the test set is small and a few unusual families change the score a lot. That is why we use 3 seeds.</p></details>
+<details><summary>Why not just a random split?</summary><p>It would be easier and look better, but it leaks near-copies of training molecules into the test. Real use means new chemistry, so scaffold split is the honest choice.</p></details>
+<details><summary>How do you handle missing Tox21 labels?</summary><p>We mask them out of the loss and the score. We never fill them with zero.</p></details>
+</section>
+
+<section id="rakesh">
+<span class="who">Rakesh</span>
+<h2>The baseline, the experiments and the demo</h2>
+<div class="say"><b>Your one line</b>We gave the old method a fair fight, tested our design choices one at a time, and built an app so anyone can try it.</div>
+
+<h3>The baseline: ECFP4 + random forest</h3>
+<p><b>ECFP4:</b> a fixed recipe. For each atom it looks 2 bonds out, turns that neighbourhood into a code, and sets bits in a 2048-slot list. Same molecule, same bits, every time.</p>
+<p><b>Random forest:</b> many decision trees voting. We train one forest for each Tox21 test, using only rows that have an answer for that test.</p>
+<p><b>Why it lost:</b> the fingerprint is fixed and cannot adapt to the task, and hashing can make different substructures collide in the same slot. The GCN can change what it pays attention to.</p>
+
+<h3>Ablations: changing one thing at a time</h3>
+<p>An ablation changes one design choice and watches the score. It shows which choices actually matter.</p>
+<div class="tablewrap"><table>
+<tr><th>Change</th><th>ESOL error</th></tr>
+<tr><td>1 layer</td><td>1.082</td></tr>
+<tr><td>2 layers</td><td>1.002</td></tr>
+<tr><td>3 layers (our choice)</td><td>1.063</td></tr>
+<tr><td>4 layers</td><td>1.053</td></tr>
+<tr><td>Pooling: mean only</td><td>0.985</td></tr>
+<tr><td>Pooling: max only</td><td>1.046</td></tr>
+<tr><td>Pooling: mean + max (our choice)</td><td>1.063</td></tr>
+</table></div>
+<figure><img src="img/depth_ablation.png" alt="Depth ablation chart" loading="lazy"><figcaption>Depth makes no clear difference. The spread between seeds is bigger than the gap between depths.</figcaption></figure>
+<div class="say"><b>How to present it</b>Differences between 1 and 4 layers are within noise, so we did not tune against them. We say this openly instead of claiming a winner.</div>
+
+<h3>The demo app</h3>
+<p>Run <code>make demo</code> and open <code>localhost:8501</code>. Draw a molecule or paste its code. The app predicts solubility and the 12 toxicity scores, and colours atoms by saliency.</p>
+<figure><img src="img/demo_screenshot.png" alt="The Streamlit demo app" loading="lazy"><figcaption>The app showing toxicity colouring for a molecule.</figcaption></figure>
+<figure><img src="img/2_aspirin.png" alt="Demo with aspirin" loading="lazy"><figcaption>Aspirin: solubility prediction and atom colouring.</figcaption></figure>
+<figure><img src="img/3_tox21_positive.png" alt="Demo with a toxic molecule" loading="lazy"><figcaption>A molecule flagged by Tox21 tests, with per-test scores.</figcaption></figure>
+<figure><img src="img/1_empty.png" alt="Demo empty start" loading="lazy"><figcaption>The start screen.</figcaption></figure>
+<figure><img src="img/4_invalid.png" alt="Demo invalid input message" loading="lazy"><figcaption>Bad input gives a clear message, not a crash.</figcaption></figure>
+<div class="watch"><b>Say out loud:</b> this is a research demo. It must not be used for safety or medical decisions.</div>
+
+<h3>Limitations (say them first)</h3>
+<ul>
+<li>GCNConv ignores bond types, so double and single bonds look alike.</li>
+<li>ESOL is small, so results vary a lot from seed to seed.</li>
+<li>Tox21 probabilities are not calibrated, because rare toxic examples were given more weight.</li>
+<li>Our Tox21 split is probably easier than the published one, so do not compare with papers directly.</li>
+</ul>
+<h3>Next steps</h3>
+<ul>
+<li>Use an edge-aware layer (GINE, GATv2 or D-MPNN) so bonds count. This is the top priority.</li>
+<li>Calibrate the Tox21 probabilities.</li>
+<li>Test on more datasets and more seeds.</li>
+</ul>
+
+<h3>Questions you may get</h3>
+<details><summary>Is the comparison fair?</summary><p>Yes. Both models use the same split file, the same seeds, and the same metrics. A check confirms they used identical data.</p></details>
+<details><summary>Did the forest do anything better?</summary><p>One Tox21 test, <code>SR-ARE</code>. Everywhere else the GCN was ahead.</p></details>
+<details><summary>Can the app be wrong?</summary><p>Yes. It is a small model trained on about a thousand to eight thousand molecules, and it is least reliable on molecules unlike its training data.</p></details>
+</section>
+
+<section id="words">
+<h2>Words in plain English</h2>
+<ul>
+<li><b>SMILES:</b> a line of text that describes a molecule, like <code>CCO</code> for ethanol.</li>
+<li><b>Graph:</b> dots (atoms) joined by lines (bonds).</li>
+<li><b>Fingerprint:</b> a list of numbers describing a molecule.</li>
+<li><b>GCN:</b> a neural network where each node averages its neighbours' information.</li>
+<li><b>Scaffold:</b> the core ring skeleton of a molecule.</li>
+<li><b>Seed:</b> a starting number for randomness. Same seed, same result.</li>
+<li><b>Epoch:</b> one full pass over the training data.</li>
+<li><b>Overfitting:</b> memorising the training data instead of learning the pattern.</li>
+<li><b>Ablation:</b> an experiment that changes one part to see if it matters.</li>
+</ul>
+</section>
+
+<footer>MolFP-GCN. Research demo only, not for safety or medical decisions.</footer>
+</div>

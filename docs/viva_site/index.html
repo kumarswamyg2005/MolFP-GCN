@@ -1,0 +1,1821 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>MolFP-GCN Viva Guide</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1d2327;--mut:#5d6b73;--card:#fff;--line:#dfe3e6;--acc:#0b6e69;--code:#f0f2f3}
+@media(prefers-color-scheme:dark){:root{--bg:#14181a;--fg:#e6eaec;--mut:#9aa8b0;--card:#1c2225;--line:#2d373c;--acc:#4fd1c5;--code:#232b2f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,sans-serif}
+header{padding:28px 16px 12px;max-width:900px;margin:auto}header h1{margin:0;font-size:1.6rem}header p{margin:.3rem 0;color:var(--mut)}
+nav{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:5}
+nav div{max-width:900px;margin:auto;padding:8px 16px;display:flex;gap:6px;overflow-x:auto}
+nav a{white-space:nowrap;padding:6px 12px;border-radius:99px;border:1px solid var(--line);color:var(--fg);text-decoration:none;font-size:.9rem}
+nav a.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+main{max-width:900px;margin:auto;padding:8px 16px 80px}section{display:none}section.on{display:block}
+h1{margin-top:1.6em}h2{margin-top:2em;border-bottom:1px solid var(--line);padding-bottom:.2em}
+pre{background:var(--code);padding:12px;border-radius:8px;overflow-x:auto;font-size:.85rem;line-height:1.45}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.88em}pre code{padding:0;background:none}
+table{border-collapse:collapse;display:block;overflow-x:auto;margin:1em 0}th,td{border:1px solid var(--line);padding:6px 10px;text-align:left}th{background:var(--code)}
+blockquote{margin:1em 0;padding:.4em 1em;border-left:4px solid var(--acc);background:var(--card);color:var(--fg)}
+.eq{font:1.05rem ui-monospace,monospace;background:var(--card);border:1px solid var(--line);padding:14px;border-radius:8px;text-align:center;overflow-x:auto}
+.figs{display:grid;gap:14px;margin:14px 0}figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+figure img{width:100%;height:auto;border-radius:6px;display:block}figcaption{color:var(--mut);font-size:.88rem;margin-top:6px}
+</style></head><body>
+<header><h1>MolFP-GCN: viva guide</h1>
+<p>Kumaraswamy (S20230010101) · Simon Peter (S20230010171) · Rakesh (S20230010196)</p>
+<p>Learned graph fingerprints vs ECFP + random forest on ESOL and Tox21. Read Overview first, then your own tab.</p></header>
+<nav><div><a href="#overview" data-tab="overview">Overview (all 3)</a><a href="#kumaraswamy" data-tab="kumaraswamy">Kumaraswamy</a><a href="#simon" data-tab="simon">Simon Peter</a><a href="#rakesh" data-tab="rakesh">Rakesh</a><a href="#cheat" data-tab="cheat">Cheat sheet</a></div></nav><main><section id="overview"><h1>Viva Script — Shared Overview (All Members Must Study This)</h1>
+<blockquote>
+<p><strong>Read this first.</strong> This section covers what every team member must know. Then read your
+own individual script for your assigned deep-dive topics.</p>
+</blockquote>
+<hr />
+<h2>🎯 One-Sentence Summary (Memorise This)</h2>
+<p>"We trained a graph convolutional network to learn a task-specific molecular fingerprint
+from atom-level graphs, and showed it beats the traditional fixed ECFP fingerprint + random
+forest on both ESOL solubility regression and Tox21 multi-label toxicity classification,
+using honest scaffold splits and three seeded runs."</p>
+<hr />
+<h2>📌 Project Name &amp; Motivation</h2>
+<p><strong>MolFP-GCN</strong> — Learned Molecular Fingerprints with Graph Convolutional Networks.</p>
+<p><strong>Why this project?</strong>
+- A molecule needs to be turned into numbers before any ML model can use it.
+- The <strong>old way</strong> (ECFP / Morgan fingerprint): a fixed hash function looks at each atom's
+  2-bond neighbourhood and writes bits. The same molecule always gets the same 2048 bits,
+  regardless of whether you want to predict solubility or toxicity.
+- <strong>Our way</strong> (GCN): treat the molecule as a graph (atoms = nodes, bonds = edges). A learned
+  neural network aggregates neighbour information in rounds. The resulting 256-number vector
+  is a <strong>learned fingerprint</strong> shaped by the training task.
+- <strong>Central question:</strong> Does the learned fingerprint actually beat ECFP + random forest when
+  both get the same data and the same honest split?</p>
+<hr />
+<h2>📊 Datasets (Know These Cold)</h2>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Task Type</th>
+<th>Size</th>
+<th>Target</th>
+<th>Missing Labels</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ESOL</strong> (Delaney 2004)</td>
+<td>Regression</td>
+<td>1,128 molecules</td>
+<td>logS (water solubility)</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Tox21</strong> (MoleculeNet)</td>
+<td>Multi-label classification</td>
+<td>7,823 molecules</td>
+<td>12 binary toxicity assays</td>
+<td>17% missing</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>logS</strong> is a log scale: −1 means 10× more soluble than −2, etc. Higher = dissolves better.</li>
+<li><strong>Tox21</strong> has 12 assay tasks (NR-AR, NR-AR-LBD, NR-AhR, NR-Aromatase, NR-ER, NR-ER-LBD,
+  NR-PPAR-gamma, SR-ARE, SR-ATAD5, SR-HSE, SR-MMP, SR-p53). Only 7.5% of known labels
+  are positive ("toxic").</li>
+<li>Source: DeepChem mirror. SHA-256 checksums verified on download.</li>
+<li>RDKit couldn't sanitise 8 Tox21 SMILES → dropped. ESOL lost none.</li>
+</ul>
+<hr />
+<h2>🏆 Results (The Numbers Everyone Must Know)</h2>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>ESOL RMSE ↓</th>
+<th>ESOL R² ↑</th>
+<th>Tox21 ROC-AUC ↑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GCN (learned FP)</strong></td>
+<td><strong>1.063 ± 0.163</strong></td>
+<td><strong>0.709 ± 0.048</strong></td>
+<td><strong>0.811 ± 0.009</strong></td>
+</tr>
+<tr>
+<td>ECFP4 + Random Forest</td>
+<td>1.694 ± 0.498</td>
+<td>0.267 ± 0.248</td>
+<td>0.756 ± 0.015</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key takeaways:</strong>
+1. GCN wins on both tasks.
+2. On Tox21, the GCN is ahead on <strong>11 of 12 assays</strong> (RF ahead only on SR-ARE).
+3. All numbers are mean ± std over <strong>seeds 0, 1, 2</strong> (scaffold split + model initialisation).</p>
+<p><strong>Caveats to mention proactively:</strong>
+- The RF's ESOL average is dragged down by seed 1 (RMSE 2.25) where polychlorinated
+  biphenyls all landed in the test set. On the other two seeds the gap is smaller.
+- The Tox21 ROC-AUC 0.811 is slightly above our expected band (0.68–0.80). Our scaffold
+  split is likely easier than DeepChem's deterministic one, so don't compare directly with papers.</p>
+<hr />
+<h2>🔑 What is a Scaffold Split? (Will Be Asked)</h2>
+<ul>
+<li>A <strong>scaffold</strong> is the core ring structure of a molecule (Bemis–Murcko framework).</li>
+<li>We group molecules by scaffold and keep each <strong>entire group</strong> in one split (train / val / test).</li>
+<li><strong>Why?</strong> Because chemistry datasets contain families of near-copies. If one family member
+  is in training and its twin is in test, the test is too easy — the model has effectively
+  "seen" the answer.</li>
+<li><strong>Ablation proof:</strong> Random split gave GCN RMSE 0.80 ± 0.02 vs scaffold split
+  1.06 ± 0.16. That improvement on random split is leakage, not real performance.</li>
+</ul>
+<hr />
+<h2>📐 Metrics Explained (So You Don't Freeze When Asked)</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>What It Means</th>
+<th>Good Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RMSE</strong></td>
+<td>Typical size of error in logS units. Lower = better.</td>
+<td>&lt; 1.5</td>
+</tr>
+<tr>
+<td><strong>MAE</strong></td>
+<td>Average absolute error. Lower = better.</td>
+<td>&lt; 1.0</td>
+</tr>
+<tr>
+<td><strong>R²</strong></td>
+<td>Fraction of variance explained. 1 = perfect, 0 = just guessing the mean.</td>
+<td>&gt; 0.5</td>
+</tr>
+<tr>
+<td><strong>ROC-AUC</strong></td>
+<td>If you pick one toxic and one non-toxic molecule at random, how often does the model rank correctly? 0.5 = coin flip, 1.0 = perfect.</td>
+<td>&gt; 0.75</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🏗️ How To Run Everything (Demo Commands)</h2>
+<pre><code class="language-bash">make all          # setup + download + train 3 seeds × 2 models × 2 datasets + evaluate + figures + tests
+make demo         # launch Streamlit at http://localhost:8501
+make ablations    # depth / readout / split ablation experiments
+make test         # run 34 pytest tests
+make lint         # ruff check + format
+</code></pre>
+<p>One single training run:</p>
+<pre><code class="language-bash">python -m molfp.train --config configs/esol_gcn.yaml --seed 0
+</code></pre>
+<hr />
+<h2>📁 Project Layout (Point to folders confidently)</h2>
+<pre><code>molfp/           → all ML code: featurize, model, train, evaluate, explain, figures
+configs/         → YAML configs for each experiment
+scripts/         → download_data.py
+app/             → Streamlit demo (streamlit_app.py + style.css)
+data/            → raw CSVs + scaffold splits
+results/         → esol.json, tox21.json, ablations.json
+reports/         → REPORT.md + figures/
+tests/           → 34 pytest tests
+docs/            → EXPLAIN.md, PROJECT_IN_SIMPLE_WORDS.md, ARCHITECTURE.md, DESIGN.md
+</code></pre>
+<hr />
+<h2>🛡️ Key Integrity Guarantees (Mention These Proactively — They Impress)</h2>
+<ol>
+<li><strong>No leakage:</strong> scaffold split tested with zero-overlap assertion on canonical SMILES.</li>
+<li><strong>Test set used once:</strong> a test scrambles test data and retrains — weights come out
+   bit-identical, proving test set is never used during training.</li>
+<li><strong>Both models see the same split:</strong> split file is the single source of truth; evaluate
+   asserts matching hashes between GCN and RF.</li>
+<li><strong>Normalisation stats from train only:</strong> changing val/test targets doesn't change them.</li>
+<li><strong>Every number auto-generated:</strong> <code>python -m molfp.figures</code> fills in all report numbers
+   from <code>results/*.json</code>. Nothing is typed by hand.</li>
+</ol>
+<hr />
+<blockquote>
+<p><strong>Now read your individual script below.</strong></p>
+</blockquote></section><section id="kumaraswamy"><h1>Viva Script — Kumaraswamy (S20230010101)</h1>
+<h2>Your Focus Areas</h2>
+<ol>
+<li><strong>GCN Model Architecture &amp; Theory</strong> (the core ML)</li>
+<li><strong>Featurisation Pipeline</strong> (SMILES → graph)</li>
+<li><strong>Saliency / Explainability</strong></li>
+</ol>
+<blockquote>
+<p>Read <a href="#">00_OVERVIEW.md</a> first for the project-level context everyone shares.</p>
+</blockquote>
+<hr />
+<h1>PART 1: THE GCN MODEL — WHAT IT IS AND HOW IT WORKS</h1>
+<h2>1.1 What Is a Graph Convolutional Network?</h2><div class="figs"><figure><a href="img/tsne_pair.png" target="_blank"><img src="img/tsne_pair.png" alt="t-SNE of the learned 256-number fingerprints: molecules with similar properties cluster together." loading="lazy"></a><figcaption>t-SNE of the learned 256-number fingerprints: molecules with similar properties cluster together.</figcaption></figure></div>
+<p><strong>Opening line for the viva:</strong></p>
+<blockquote>
+<p>"A GCN is a neural network that operates on graph-structured data. In our case, each
+molecule is a graph — atoms are nodes, bonds are edges — and the GCN learns to combine
+atom information through message passing to produce a molecule-level representation."</p>
+</blockquote>
+<p><strong>How it works in simple steps:</strong>
+1. Each atom starts with a <strong>35-dimensional feature vector</strong> (element type, degree, charge,
+   hydrogen count, hybridisation, aromaticity, ring membership, mass).
+2. A linear layer projects those 35 numbers into <strong>128 dimensions</strong>.
+3. Then <strong>3 GCNConv layers</strong> run. In each layer, every atom takes a <strong>degree-normalised
+   average</strong> of its own features and its bonded neighbours' features, then applies a shared
+   linear transformation.
+4. After all layers, <strong>mean pooling</strong> (average across all atoms) and <strong>max pooling</strong> (max
+   across all atoms) are concatenated → a <strong>256-dimensional learned fingerprint</strong>.
+5. A 2-layer MLP maps this fingerprint to the final prediction: 1 number (logS for ESOL)
+   or 12 logits (Tox21 toxicity).</p>
+<p><strong>Diagram to draw on the board:</strong></p>
+<pre><code>Atom features [n_atoms × 35]
+       │
+  Linear(35 → 128)
+       │
+  GCNConv + BN + ReLU + Dropout   ← Layer 1
+       │
+  GCNConv + BN + ReLU + Dropout   ← Layer 2 (+residual)
+       │
+  GCNConv + BN + ReLU + Dropout   ← Layer 3 (+residual)
+       │
+  mean ‖ max  pooling → [256]     ← THE LEARNED FINGERPRINT
+       │
+  MLP(256 → 128 → output)         ← Property head
+</code></pre>
+<h2>1.2 The GCNConv Equation — Be Ready to Write This</h2>
+<div class="eq">H&#x27; = D^{-1/2} (A + I) D^{-1/2} \cdot H \cdot W</div>
+
+<p><strong>Break it down piece by piece:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>What It Is</th>
+<th>Why It's There</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>H</strong></td>
+<td>Atom feature matrix [n_atoms × features]</td>
+<td>Current state of all atoms</td>
+</tr>
+<tr>
+<td><strong>A</strong></td>
+<td>Adjacency matrix (1 if two atoms bonded)</td>
+<td>Defines the graph structure</td>
+</tr>
+<tr>
+<td><strong>+I</strong></td>
+<td>Self-loop (identity matrix added)</td>
+<td>Without it, an atom's update would lose its own identity — it would only contain neighbour info</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>Degree matrix (diagonal: how many bonds each atom has)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>D^{−½} … D^{−½}</strong></td>
+<td>Symmetric normalisation</td>
+<td>Without this, a carbon with 4 neighbours sums 4 messages while a terminal oxygen sums 1. The symmetric form divides by √(deg_i · deg_j), keeping values stable</td>
+</tr>
+<tr>
+<td><strong>W</strong></td>
+<td>Learnable weight matrix, shared across ALL atoms</td>
+<td>Like a CNN kernel shared across pixels — this is what makes it work for molecules of any size</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Analogy to use:</strong></p>
+<blockquote>
+<p>"It's like people in a room. Each person asks their neighbours what they know, averages
+it with their own knowledge, and updates their opinion. After 3 rounds, everyone knows
+about people up to 3 handshakes away."</p>
+</blockquote>
+<h2>1.3 Why 3 Layers? Connection to ECFP Radius</h2>
+<ul>
+<li>After <strong>L layers</strong>, each atom's vector contains information from atoms up to <strong>L bonds away</strong>.</li>
+<li><strong>ECFP4</strong> has radius 2, so it sees atoms 2 bonds away.</li>
+<li><strong>3 GCN layers</strong> see one bond further — same neighbourhood range.</li>
+<li><strong>Too many layers</strong> → <strong>over-smoothing</strong>: every atom's vector converges to the molecule-wide
+  average, and max pooling has nothing to pick out.</li>
+</ul>
+<p><strong>Ablation result (be ready to quote):</strong>
+- Depth 1: RMSE 1.082 ± 0.204
+- Depth 2: RMSE 1.002 ± 0.135
+- Depth 3: RMSE 1.063 ± 0.163 (our default)
+- Depth 4: RMSE 1.053 ± 0.156
+- All within noise — we didn't see over-smoothing at 4 layers, probably because of <strong>residual connections</strong> (skip connections from layer 2 onwards).</p>
+<h2>1.4 Residual Connections — Why and Where</h2>
+<p><strong>In our code (<code>model.py</code> line 56):</strong></p>
+<pre><code class="language-python">h = h + out if i &gt;= 1 else out  # residual from layer 2 on
+</code></pre>
+<ul>
+<li>Layer 1 changes the representation the most (from 35-dim atom features to abstract embeddings).</li>
+<li>Layers 2 and 3 refine it. The <strong>skip connection</strong> lets gradients flow directly to earlier layers,
+  preventing vanishing gradients and reducing over-smoothing.</li>
+</ul>
+<h2>1.5 Why Mean + Max Pooling? Permutation Invariance</h2>
+<p><strong>Key concept:</strong> A molecule's atoms have <strong>no natural order</strong>. The SMILES <code>c1ccccc1</code> and
+<code>c1ccc(cc1)</code> describe the same benzene differently. If our readout depended on atom order,
+the same molecule would get two different predictions.</p>
+<p><strong>Mean pooling</strong> captures: "What is this molecule made of on average?"
+<strong>Max pooling</strong> captures: "Is there at least one atom/group like X?" (e.g., one nitro group
+can dominate toxicity but would get diluted by mean).</p>
+<p><strong>Test:</strong> we renumber atoms randomly and check the output differs by &lt; 1e-5.</p>
+<p><strong>Ablation result:</strong>
+- Mean only: 0.985 ± 0.172
+- Max only: 1.046 ± 0.072
+- Mean+Max: 1.063 ± 0.163
+- No clear winner — we kept mean+max as it was the planned default.</p>
+<hr />
+<h1>PART 2: THE FEATURISATION PIPELINE</h1>
+<h2>2.1 From SMILES to Graph</h2>
+<p><strong>Pipeline (be ready to trace through):</strong></p>
+<pre><code>&quot;CC(=O)Oc1ccccc1C(=O)O&quot;  (aspirin)
+        │
+   RDKit parses it
+        │
+   featurize.parse_smiles() → (Mol object, None) or (None, &quot;reason&quot;)
+        │
+   featurize.mol_to_data() → PyG Data object:
+        • x: [n_atoms × 35] float tensor — atom feature vectors
+        • edge_index: [2 × 2·n_bonds] long tensor — directed edges
+        • edge_attr: [2·n_bonds × 6] float tensor — bond features (STORED but NOT USED by GCNConv)
+        • y: target label(s)
+        • smiles: original string
+        • num_atoms: count
+</code></pre>
+<h2>2.2 Atom Features — 35 Numbers (KNOW THIS TABLE)</h2>
+<table>
+<thead>
+<tr>
+<th>Feature Block</th>
+<th>Values</th>
+<th>Width</th>
+<th>Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Element</td>
+<td>C, N, O, S, F, Cl, Br, I, P, other</td>
+<td>10</td>
+<td>0–9</td>
+</tr>
+<tr>
+<td>Degree</td>
+<td>0, 1, 2, 3, 4, 5, other</td>
+<td>7</td>
+<td>10–16</td>
+</tr>
+<tr>
+<td>Formal charge</td>
+<td>−1, 0, +1, other</td>
+<td>4</td>
+<td>17–20</td>
+</tr>
+<tr>
+<td>Total H count</td>
+<td>0, 1, 2, 3, 4</td>
+<td>5</td>
+<td>21–25</td>
+</tr>
+<tr>
+<td>Hybridisation</td>
+<td>SP, SP2, SP3, SP3D, SP3D2, other</td>
+<td>6</td>
+<td>26–31</td>
+</tr>
+<tr>
+<td>Is aromatic</td>
+<td>0/1</td>
+<td>1</td>
+<td>32</td>
+</tr>
+<tr>
+<td>Is in ring</td>
+<td>0/1</td>
+<td>1</td>
+<td>33</td>
+</tr>
+<tr>
+<td>Mass / 100</td>
+<td>float (C = 0.12)</td>
+<td>1</td>
+<td>34</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why "other" slots?</strong> If a rare element appears that's not in our list, it falls into the
+"other" bin instead of crashing. Same for unusual degrees or charges.</p>
+<p><strong>Why mass/100?</strong> Raw mass (e.g. 12.0, 16.0) would dominate the other features which are 0/1.
+Dividing by 100 keeps it in a similar range.</p>
+<h2>2.3 Bond Features — 6 Numbers (Stored But Not Used)</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bond type</td>
+<td>single, double, triple, aromatic (one-hot, 4 dims)</td>
+</tr>
+<tr>
+<td>Is conjugated</td>
+<td>0/1</td>
+</tr>
+<tr>
+<td>Is in ring</td>
+<td>0/1</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Critical talking point:</strong> GCNConv ignores these! A C=O and a C–O send identical messages.
+The features are stored in <code>edge_attr</code> so a future edge-aware layer (GINE, GATv2, D-MPNN)
+could use them <strong>without changing the featuriser</strong> — only <code>model.py</code> would change.</p>
+<h2>2.4 Graph Rules</h2>
+<ul>
+<li>Every bond i–j becomes <strong>two directed edges</strong>: i→j and j→i. This is because PyG's
+  GCNConv expects directed edges.</li>
+<li><strong>Hydrogens are implicit</strong>: counted as a feature on the heavy atom, never added as nodes.
+  This keeps the graph smaller without losing information.</li>
+</ul>
+<h2>2.5 Error Handling — parse_smiles Never Crashes</h2>
+<pre><code class="language-python">def parse_smiles(smiles):
+    &quot;&quot;&quot;Return (mol, None) or (None, reason). Never raises.&quot;&quot;&quot;
+</code></pre>
+<ul>
+<li>Empty/non-string input → <code>(None, "empty input")</code></li>
+<li>Syntax error → <code>(None, "syntax error (check brackets and ring-closure digits)")</code></li>
+<li>Invalid chemistry → <code>(None, "invalid chemistry: {e}")</code></li>
+<li>No atoms → <code>(None, "no atoms")</code></li>
+</ul>
+<p><strong>This is invariant 3.</strong> The demo shows a friendly error message; the data loader drops
+and logs the count.</p>
+<hr />
+<h1>PART 3: SALIENCY / EXPLAINABILITY</h1>
+<h2>3.1 What Is Saliency?</h2>
+<p>For a prediction <em>o</em> and atom feature matrix <em>X</em> [atoms × 35]:</p>
+<p><strong>Score for atom i</strong> = Σ_f X[i,f] × ∂o/∂X[i,f]</p>
+<p>This is a <strong>gradient × input</strong> attribution. It's a first-order (Taylor) estimate of how
+much atom i's features contribute to the output.</p>
+<p><strong>In code (<code>explain.py</code>):</strong></p>
+<pre><code class="language-python">out[0, target].backward()
+s = (x.grad * x).sum(dim=1)  # one score per atom
+# then scale to [-1, 1] by dividing by max |score|
+</code></pre>
+<h2>3.2 How to Read the Colours</h2>
+<table>
+<thead>
+<tr>
+<th>Colour</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Red</strong></td>
+<td>This atom's features push the prediction <strong>UP</strong> (more soluble / more toxic)</td>
+</tr>
+<tr>
+<td><strong>Blue</strong></td>
+<td>This atom's features push the prediction <strong>DOWN</strong> (less soluble / less toxic)</td>
+</tr>
+<tr>
+<td><strong>White</strong></td>
+<td>Didn't matter much</td>
+</tr>
+</tbody>
+</table>
+<h2>3.3 Chemical Sense Check — Examples to Mention</h2><div class="figs"><figure><a href="img/saliency_examples.png" target="_blank"><img src="img/saliency_examples.png" alt="Saliency maps: red atoms push the prediction up, blue push it down." loading="lazy"></a><figcaption>Saliency maps: red atoms push the prediction up, blue push it down.</figcaption></figure></div>
+<ul>
+<li><strong>ESOL:</strong> Carbonyl (C=O) and hydroxyl (O-H) oxygens → <strong>red</strong> (they like water, increase solubility).
+  Aromatic carbon rings and chlorinated carbons → <strong>blue</strong> (hydrophobic, decrease solubility).
+  This makes chemical sense!</li>
+</ul>
+<h2>3.4 Limitations of Saliency (IMPORTANT — Will Be Asked)</h2>
+<ol>
+<li><strong>Gradients are local</strong>: they describe a tiny change to features, not what happens if you
+   remove the atom entirely.</li>
+<li><strong>ReLU saturation</strong>: an important atom can show a small gradient if the ReLU is in its
+   flat region.</li>
+<li><strong>Message passing spreads credit</strong>: a carbon may light up because of the oxygen bonded
+   to it — they've been mixing information for 3 rounds.</li>
+<li><strong>It explains the model, not the chemistry</strong>: the model may have learned a shortcut or
+   correlation, not the true mechanism.</li>
+</ol>
+<p><strong>Good closing line:</strong></p>
+<blockquote>
+<p>"We treat saliency as a hint about what the model relied on, not as a chemical explanation."</p>
+</blockquote>
+<hr />
+<h1>POSSIBLE QUESTIONS FOR KUMARASWAMY</h1>
+<h3>Q1: "What does one GCNConv layer compute?"</h3>
+<p>→ Write the equation, explain A+I (self-loop), D^{-½} (degree normalisation), W (shared weights).</p>
+<h3>Q2: "Why not use GAT or MPNN instead?"</h3>
+<p>→ "GCNConv was our starting point because it's the simplest graph layer. Its limitation is
+that it ignores bond types — a C=O and C–O send the same message. GAT learns attention
+weights per edge so neighbours contribute unequally. An MPNN/GINE computes messages as a
+function of both the neighbour and the bond features. Our featuriser already stores bond
+type, conjugation and ring membership in <code>edge_attr</code>, so switching to an edge-aware layer
+would be a change to <code>model.py</code> only — no new data processing needed. That's our top
+recommendation for future work."</p>
+<h3>Q3: "How many parameters does the model have?"</h3>
+<p>→ "Roughly:
+- Input linear: 35 × 128 = 4,480
+- 3 GCNConv layers: 3 × 128 × 128 ≈ 49,152
+- BatchNorm: 3 × 256 = 768
+- MLP head: 256 × 128 + 128 × 1 (or 12) ≈ 32,896
+- Total: ~87,000 parameters. Small enough to train on CPU in under a minute per seed."</p>
+<h3>Q4: "What is over-smoothing?"</h3>
+<p>→ "With many message-passing layers, every atom ends up averaging over nearly the whole
+molecule. All atom vectors converge to the same value, so max pooling has nothing to
+distinguish. We tested 1–4 layers and didn't see it, likely because residual connections
+let later layers add to the original representation rather than replace it."</p>
+<h3>Q5: "Why gradient × input instead of just gradients?"</h3>
+<p>→ "Raw gradients tell you how <em>sensitive</em> the output is to each feature, but a feature
+that's zero contributes nothing regardless of its gradient. Multiplying by the feature value
+weights the sensitivity by what's actually there. It's a first-order Taylor approximation of
+removing that feature."</p>
+<h3>Q6: "Could you use attention-based explanations instead?"</h3>
+<p>→ "Yes, if we used GATv2 we'd get attention weights per edge which show how much each
+neighbour contributed. But attention weights can be misleading — they show what the model
+attends to, not necessarily what drives the output. Gradient-based methods are model-agnostic
+and more directly tied to the output value."</p>
+<hr />
+<h1>QUICK REFERENCE CARD</h1>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model name</td>
+<td>MolGCN</td>
+</tr>
+<tr>
+<td>Input dim</td>
+<td>35 (atom features)</td>
+</tr>
+<tr>
+<td>Hidden dim</td>
+<td>128</td>
+</tr>
+<tr>
+<td>GCN layers</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Fingerprint dim</td>
+<td>256 (128 mean + 128 max)</td>
+</tr>
+<tr>
+<td>Dropout</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>Activation</td>
+<td>ReLU</td>
+</tr>
+<tr>
+<td>Normalisation</td>
+<td>BatchNorm after each GCN layer</td>
+</tr>
+<tr>
+<td>Residual</td>
+<td>From layer 2 onwards</td>
+</tr>
+<tr>
+<td>Output</td>
+<td>1 (ESOL logS) or 12 (Tox21 logits)</td>
+</tr>
+<tr>
+<td>Bond features</td>
+<td>Stored but NOT used (GCNConv limitation)</td>
+</tr>
+<tr>
+<td>Saliency method</td>
+<td>Gradient × input, scaled to [−1, 1]</td>
+</tr>
+<tr>
+<td>Key code files</td>
+<td><code>model.py</code>, <code>featurize.py</code>, <code>explain.py</code></td>
+</tr>
+</tbody>
+</table></section><section id="simon"><h1>Viva Script — Simon Peter (S20230010171)</h1>
+<h2>Your Focus Areas</h2>
+<ol>
+<li><strong>Data Pipeline &amp; Scaffold Splitting</strong></li>
+<li><strong>Training Loop &amp; Optimisation</strong></li>
+<li><strong>Evaluation, Metrics &amp; Reproducibility</strong></li>
+</ol>
+<blockquote>
+<p>Read <a href="#">00_OVERVIEW.md</a> first for the project-level context everyone shares.</p>
+</blockquote>
+<hr />
+<h1>PART 1: DATA PIPELINE</h1>
+<h2>1.1 Where the Data Comes From</h2>
+<p><strong>Source:</strong> DeepChem mirror of MoleculeNet benchmark datasets.</p>
+<p><strong>Download:</strong></p>
+<pre><code class="language-bash">python scripts/download_data.py
+</code></pre>
+<ul>
+<li>Downloads <code>delaney-processed.csv</code> (ESOL) and <code>tox21.csv</code> to <code>data/raw/</code>.</li>
+<li>SHA-256 checksums are verified against <code>data/CHECKSUMS.txt</code> — the script <strong>refuses to
+  continue</strong> if a file has changed. This ensures reproducibility.</li>
+</ul>
+<h2>1.2 Data Loading (<code>data.py</code>)</h2>
+<p>The loading pipeline:</p>
+<pre><code>data/raw/delaney-processed.csv  →  pd.read_csv()
+                                       │
+                              parse_smiles() on each row
+                                       │
+                              Drop invalid SMILES (log the count)
+                                       │
+                              Return: (smiles_list, y_array[n × n_tasks], task_names)
+</code></pre>
+<p><strong>Key details:</strong>
+- ESOL: 1,128 molecules, 1 target column ("measured log solubility in mols per litre").
+  None are invalid, so no rows are dropped.
+- Tox21: 7,831 rows, but <strong>8 have SMILES that RDKit can't sanitise</strong> → dropped with a
+  logged count → <strong>7,823 usable molecules</strong>, 12 target columns.
+- <strong>NaN = missing label</strong> in Tox21. 17% of labels are NaN.
+- The function is <code>@cache</code>-decorated, so it's loaded once and shared.</p>
+<h2>1.3 Graph Construction (<code>load_graphs</code> in <code>data.py</code>)</h2>
+<pre><code class="language-python">@cache
+def load_graphs(name):
+    smiles, y, _ = load_dataset(name)
+    return [smiles_to_data(s, yi) for s, yi in zip(smiles, y)]
+</code></pre>
+<ul>
+<li>Each valid molecule becomes a PyG <code>Data</code> object with atom features (x), edges (edge_index),
+  bond features (edge_attr), target (y), SMILES string, and atom count.</li>
+<li><strong>Row i here = index i in the split files.</strong> This is the contract between data loading and
+  splitting.</li>
+</ul>
+<hr />
+<h1>PART 2: SCAFFOLD SPLITTING — THE HEART OF HONEST EVALUATION</h1>
+<h2>2.1 What Is a Scaffold?</h2>
+<p>A <strong>Bemis–Murcko scaffold</strong> is the core ring structure of a molecule plus the linkers between
+rings, with all side chains stripped off.</p>
+<p><strong>Example:</strong>
+- Aspirin, ibuprofen, and salicylic acid share a benzene ring scaffold.
+- Polychlorinated biphenyls (PCBs) share a biphenyl scaffold.</p>
+<h2>2.2 How the Scaffold Split Works (Know This Algorithm)</h2>
+<pre><code>Step 1: Group molecules by scaffold SMILES
+        (acyclic molecules all share the empty scaffold &quot;&quot;)
+
+Step 2: Sort groups into &quot;big&quot; (&gt; half the val/test size) and &quot;small&quot;
+        Big groups go first (shuffled by seed)
+        Small groups go next (shuffled by seed)
+
+Step 3: Greedily assign groups:
+        → train while it stays ≤ 80%
+        → val while it stays ≤ 10%
+        → test (the rest, ~10%)
+
+Rule: A WHOLE GROUP always lands in ONE split.
+      No scaffold ever appears in more than one split.
+</code></pre>
+<p><strong>Split ratio:</strong> 80% train / 10% validation / 10% test</p>
+<p><strong>The split is saved to:</strong> <code>data/splits/{dataset}_seed{n}.json</code>
+- Contains: <code>{"train": [...], "val": [...], "test": [...], "hash": "...", ...}</code>
+- The <strong>hash</strong> is SHA-256 of the index lists. It's checked on every load — if someone edits
+  the file, it raises an error.</p>
+<h2>2.3 Why Scaffold Split Matters — Be Ready With This Argument</h2><div class="figs"><figure><a href="img/ablations_esol.png" target="_blank"><img src="img/ablations_esol.png" alt="Random split looks better than scaffold split. That gap is leakage, not skill." loading="lazy"></a><figcaption>Random split looks better than scaffold split. That gap is leakage, not skill.</figcaption></figure></div>
+<blockquote>
+<p>"Chemistry datasets contain families of near-identical molecules — same ring system,
+different side chain. A random split puts relatives on both sides, so the model gets tested
+on molecules it has essentially seen. The scaffold split keeps each family together. This
+is closer to the real use case: predicting properties of genuinely new chemistry."</p>
+</blockquote>
+<p><strong>Ablation proof (your money quote):</strong>
+| Split | GCN RMSE | RF RMSE |
+|-------|----------|---------|
+| Scaffold | 1.063 ± 0.163 | 1.694 ± 0.498 |
+| Random | 0.800 ± 0.023 | 1.256 ± 0.037 |</p>
+<p>Both models look much better on random split. That improvement is <strong>leakage</strong>, not real
+performance. The scaffold split is honest.</p>
+<h2>2.4 Both Models See the Same Split (Invariant 8)</h2>
+<ul>
+<li><code>split.get_split()</code> is called by <strong>both</strong> the GCN trainer and the RF baseline.</li>
+<li>The split file is the <strong>single source of truth</strong>.</li>
+<li><code>evaluate.py</code> asserts that the split hashes match between GCN and RF runs. If they don't,
+  it raises a <code>RuntimeError</code>.</li>
+</ul>
+<hr />
+<h1>PART 3: THE TRAINING LOOP</h1>
+<h2>3.1 Training Configuration (YAML → Dataclass)</h2>
+<pre><code class="language-yaml"># configs/esol_gcn.yaml
+dataset: esol
+name: gcn
+split: scaffold
+hidden: 128
+layers: 3
+dropout: 0.2
+readout: meanmax
+lr: 0.001            # learning rate
+weight_decay: 0.00001 # L2 regularisation
+batch_size: 64
+max_epochs: 300
+patience: 30          # early stopping patience
+</code></pre>
+<p><strong>Both ESOL and Tox21 use identical hyperparameters.</strong> They were fixed in advance and not
+tuned for either model — this keeps the comparison fair.</p>
+<h2>3.2 The Training Loop Step by Step</h2><div class="figs"><figure><a href="img/training_curves.png" target="_blank"><img src="img/training_curves.png" alt="Training and validation curves; early stopping keeps the best epoch." loading="lazy"></a><figcaption>Training and validation curves; early stopping keeps the best epoch.</figcaption></figure></div>
+<pre><code>for each epoch (up to 300):
+    1. Shuffle training molecules into batches of 64
+    2. For each batch:
+       a. Forward pass: model(batch) → predictions
+       b. Compute loss (MSE for ESOL, masked BCE for Tox21)
+       c. Backward pass: compute gradients
+       d. Optimizer step: update weights
+    3. Score on validation set
+    4. If val metric improved → save checkpoint (best.pt)
+    5. If no improvement for 30 epochs → STOP (early stopping)
+</code></pre>
+<h2>3.3 ESOL Loss — MSE on Normalised Targets</h2>
+<pre><code class="language-python">def target_stats(y, train_idx):
+    t = y[train_idx]
+    return {&quot;mean&quot;: float(t.mean()), &quot;std&quot;: float(t.std())}
+
+loss = MSE(prediction, (y - train_mean) / train_std)
+</code></pre>
+<p><strong>Critical:</strong> Normalisation stats come from the <strong>train split only</strong> (invariant 6). At
+inference, predictions are de-normalised: <code>pred * std + mean</code>.</p>
+<h2>3.4 Tox21 Loss — Masked Binary Cross-Entropy</h2>
+<pre><code class="language-python">def masked_bce(logits, y, pos_weight=None):
+    m = ~torch.isnan(y)  # mask: True where labelled
+    return BCE_with_logits(logits[m], y[m], pos_weight=pw[m])
+</code></pre>
+<p><strong>Two complications handled:</strong>
+1. <strong>Missing labels (17%):</strong> NaN values are <strong>masked out</strong>, never filled with 0.
+   Filling with 0 would teach the model that untested molecules are non-toxic — that's false.
+2. <strong>Class imbalance (7.5% positive):</strong> <code>pos_weight</code> = negatives/positives per assay,
+   computed on the training set only. This upweights the rare toxic examples so the model
+   can't score well by always predicting "not toxic".</p>
+<h2>3.5 Optimizer &amp; Early Stopping</h2>
+<ul>
+<li><strong>Adam</strong> optimizer: lr=1e-3, weight_decay=1e-5 (L2 regularisation).</li>
+<li><strong>Early stopping:</strong> patience=30 epochs. If the validation metric (RMSE for ESOL, mean
+  ROC-AUC for Tox21) hasn't improved for 30 epochs, training stops and the best checkpoint
+  is kept.</li>
+<li>Best epochs in practice: ESOL seeds 0,1,2 → epochs 24, 43, 25.
+  Tox21 seeds 0,1,2 → epochs 73, 28, 56.</li>
+</ul>
+<h2>3.6 Seeding — Exact Reproducibility</h2>
+<pre><code class="language-python">def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True, warn_only=True)
+</code></pre>
+<p>The seed controls:
+- The scaffold split (which groups go where)
+- Model weight initialisation
+- Batch shuffling order
+- All random operations in NumPy/PyTorch</p>
+<p><strong>Result:</strong> <code>make all</code> from a fresh clone reproduced every committed result <strong>byte for byte</strong>
+on an Apple M2 CPU in 11 minutes.</p>
+<hr />
+<h1>PART 4: EVALUATION &amp; METRICS</h1>
+<h2>4.1 Evaluation Flow (<code>evaluate.py</code>)</h2>
+<pre><code>For each dataset (esol / tox21):
+    For each model (gcn / rf):
+        For each seed (0, 1, 2):
+            1. Load checkpoint (GCN) or train RF
+            2. Predict on test split (ONCE only)
+            3. Compute metrics
+    Assert GCN and RF used the same split (hash check)
+    Compute mean ± std across seeds
+    Write results/{dataset}.json
+</code></pre>
+<h2>4.2 Understanding the Metrics</h2><div class="figs"><figure><a href="img/parity_esol.png" target="_blank"><img src="img/parity_esol.png" alt="ESOL predicted vs measured logS on the test set (GCN vs random forest)." loading="lazy"></a><figcaption>ESOL predicted vs measured logS on the test set (GCN vs random forest).</figcaption></figure></div>
+<h3>RMSE (Root Mean Squared Error) — ESOL</h3>
+<pre><code class="language-python">rmse = sqrt(mean((y_true - y_pred)²))
+</code></pre>
+<ul>
+<li>In logS units. RMSE of 1 means the prediction is typically off by 1 log unit (a factor of
+  10 in solubility). Lower is better.</li>
+</ul>
+<h3>MAE (Mean Absolute Error) — ESOL</h3>
+<pre><code class="language-python">mae = mean(|y_true - y_pred|)
+</code></pre>
+<ul>
+<li>Less sensitive to outliers than RMSE. Lower is better.</li>
+</ul>
+<h3>R² (Coefficient of Determination) — ESOL</h3>
+<pre><code class="language-python">r2 = 1 - SS_res / SS_tot
+</code></pre>
+<ul>
+<li>1 = perfect predictions, 0 = no better than guessing the mean. Higher is better.</li>
+</ul>
+<h3>ROC-AUC (Area Under ROC Curve) — Tox21</h3>
+<ul>
+<li>"If you pick one toxic and one non-toxic molecule at random, how often does the model rank
+  the toxic one as more likely toxic?"</li>
+<li>0.5 = coin flip, 1.0 = perfect ranking. Higher is better.</li>
+<li>Computed <strong>per assay</strong> on labelled rows only, then averaged across assays.</li>
+<li>Tasks where all test labels are one class get NaN and are excluded from the mean.</li>
+</ul>
+<h2>4.3 The Seed 1 ESOL Story — Know This Cold</h2>
+<p><strong>What happened:</strong> In seed 1, the polychlorinated biphenyl (PCB) scaffold group all landed
+in the test set. These are the <strong>least soluble</strong> molecules in ESOL (logS down to −11.6).</p>
+<p><strong>Why the RF failed badly:</strong>
+- A random forest predicts by averaging training targets. It <strong>can't predict below its
+  training range</strong> — it's bounded by the most extreme training example.
+- ECFP bits record that chlorine is <em>present</em>, not <em>how many</em> there are. So all PCBs look
+  similar in ECFP space.
+- RF predicted −4.6 for the least soluble molecule; GCN predicted −7.2 (true: even lower).</p>
+<p><strong>Per-seed results:</strong>
+| Seed | GCN RMSE | RF RMSE |
+|------|----------|---------|
+| 0 | 0.904 | 1.288 |
+| 1 | 1.230 | <strong>2.249</strong> ← the PCB seed |
+| 2 | 1.055 | 1.545 |</p>
+<p><strong>Talking point:</strong> "The GCN still wins on all three seeds, but the headline mean exaggerates
+the gap because of seed 1. On a typical split (seeds 0 and 2), the margin is smaller."</p>
+<h2>4.4 The Tox21 ROC-AUC Caveat</h2><div class="figs"><figure><a href="img/tox21_per_task.png" target="_blank"><img src="img/tox21_per_task.png" alt="Tox21 ROC-AUC per assay: GCN is ahead on 11 of 12." loading="lazy"></a><figcaption>Tox21 ROC-AUC per assay: GCN is ahead on 11 of 12.</figcaption></figure></div>
+<p>Our Tox21 ROC-AUC of 0.811 is slightly above our expected band of 0.68–0.80.</p>
+<p><strong>Explanation:</strong> DeepChem's deterministic scaffold split sends the <strong>rarest scaffolds</strong> to
+test, which is harder. Our split sends large groups to train first and samples test from
+smaller groups at random — this is likely easier. So our numbers <strong>should not be compared
+directly with published papers</strong>.</p>
+<hr />
+<h1>PART 5: REPRODUCIBILITY GUARANTEES</h1>
+<h2>5.1 The Integrity Tests You Should Mention</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>What It Proves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_scaffold_split_properties</code></td>
+<td>No scaffold crosses splits; ratios ≈ 80/10/10</td>
+</tr>
+<tr>
+<td><code>test_train_never_sees_test</code></td>
+<td>Scramble test data, retrain → weights are bit-identical (test set unused during training)</td>
+</tr>
+<tr>
+<td><code>test_normalization_*</code></td>
+<td>Changing val/test targets doesn't change normalisation stats</td>
+</tr>
+<tr>
+<td><code>test_gcn_and_rf_use_same_split</code></td>
+<td>Both models read the same split file</td>
+</tr>
+<tr>
+<td><code>test_split_file_is_single_source_of_truth</code></td>
+<td>Both models follow even a deliberately altered split file</td>
+</tr>
+<tr>
+<td><code>test_permutation_invariance</code></td>
+<td>Reorder atoms → output changes by &lt; 1e-5</td>
+</tr>
+<tr>
+<td><code>test_masked_bce_ignores_nan</code></td>
+<td>NaN labels contribute zero to the loss</td>
+</tr>
+<tr>
+<td><code>test_masked_roc_auc_ignores_nan</code></td>
+<td>NaN labels excluded from ROC-AUC</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total:</strong> 34 tests, all passing.</p>
+<h2>5.2 Checkpoint Contents</h2>
+<p>Each <code>best.pt</code> stores:</p>
+<pre><code class="language-python">{
+    &quot;state_dict&quot;: model weights,
+    &quot;config&quot;: full Config dataclass as dict,
+    &quot;seed&quot;: seed number,
+    &quot;out_dim&quot;: number of output dimensions,
+    &quot;norm&quot;: {&quot;mean&quot;: ..., &quot;std&quot;: ...} for ESOL, None for Tox21,
+    &quot;featurizer_version&quot;: &quot;1&quot;,
+    &quot;split_hash&quot;: 16-char hex hash of split indices,
+    &quot;epoch&quot;: best epoch number,
+    &quot;val&quot;: validation metrics at best epoch,
+}
+</code></pre>
+<p>If the featurizer version in the checkpoint doesn't match the current code, loading raises
+an error. This prevents using a model trained with different features.</p>
+<hr />
+<h1>POSSIBLE QUESTIONS FOR SIMON PETER</h1>
+<h3>Q1: "Why not tune hyperparameters?"</h3>
+<p>→ "We fixed all hyperparameters in advance to keep the comparison fair. Tuning one model
+and not the other would be misleading. We also only have ~1,100 ESOL molecules — a
+validation set of ~110 molecules is too small for reliable hyperparameter selection. A
+tuned RF (or one with count-based fingerprints instead of bits) would probably close some
+of the ESOL gap."</p>
+<h3>Q2: "Why 3 seeds? Isn't that too few?"</h3>
+<p>→ "Three seeds give a rough error bar showing run-to-run spread, not a formal significance
+test. With ESOL's 114 test molecules, one scaffold group can move the RMSE by more than the
+difference between models (as seed 1 shows). For a proper significance test we'd need more
+seeds and a paired test, but 3 seeds with full reporting of per-seed numbers is standard for
+MoleculeNet papers."</p>
+<h3>Q3: "How do you handle the class imbalance in Tox21?"</h3>
+<p>→ "Only 7.5% of labelled Tox21 entries are positive ('toxic'). Without correction, the model
+could score well by always predicting 'not toxic'. We compute <code>pos_weight</code> = (number of
+negatives / number of positives) per assay on the training set only, and pass it to BCE loss.
+This upweights the rare positives. Side effect: predicted probabilities run high, so we tell
+users to compare molecules rather than read probabilities as absolute risk."</p>
+<h3>Q4: "What if someone edits the split file?"</h3>
+<p>→ "Every split file stores a SHA-256 hash of its index lists. <code>get_split()</code> recomputes the
+hash on every load and raises a ValueError if it doesn't match. Additionally, <code>evaluate.py</code>
+asserts that the GCN and RF split hashes match."</p>
+<h3>Q5: "Why Adam and not SGD?"</h3>
+<p>→ "Adam adapts the learning rate per parameter, which helps on sparse molecular features
+where some atoms/features appear rarely. We also use weight decay (1e-5) for L2
+regularisation. We didn't compare optimizers — this is a standard choice."</p>
+<h3>Q6: "What does early stopping actually save you from?"</h3>
+<p>→ "Without early stopping, the model would train for all 300 epochs and overfit the training
+set. Early stopping monitors the validation metric and keeps the checkpoint from the epoch
+where validation performance was best. With patience=30, it waits 30 epochs after the last
+improvement before stopping, to avoid stopping too early on a noisy metric."</p>
+<hr />
+<h1>QUICK REFERENCE CARD</h1>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Train/Val/Test ratio</td>
+<td>80/10/10 scaffold split</td>
+</tr>
+<tr>
+<td>Split file location</td>
+<td><code>data/splits/{dataset}_seed{n}.json</code></td>
+</tr>
+<tr>
+<td>Optimizer</td>
+<td>Adam, lr=1e-3, weight_decay=1e-5</td>
+</tr>
+<tr>
+<td>Batch size</td>
+<td>64</td>
+</tr>
+<tr>
+<td>Max epochs</td>
+<td>300</td>
+</tr>
+<tr>
+<td>Early stopping patience</td>
+<td>30 epochs</td>
+</tr>
+<tr>
+<td>ESOL loss</td>
+<td>MSE on z-scored targets (train stats only)</td>
+</tr>
+<tr>
+<td>Tox21 loss</td>
+<td>Masked BCE with per-assay pos_weight</td>
+</tr>
+<tr>
+<td>Seeds</td>
+<td>0, 1, 2</td>
+</tr>
+<tr>
+<td>ESOL test size</td>
+<td>~114 molecules (seed 0)</td>
+</tr>
+<tr>
+<td>Tox21 test size</td>
+<td>~783 molecules (seed 0)</td>
+</tr>
+<tr>
+<td>Total pytest tests</td>
+<td>34, all passing</td>
+</tr>
+<tr>
+<td>Reproducibility</td>
+<td>Byte-identical results from fresh clone</td>
+</tr>
+<tr>
+<td>Key code files</td>
+<td><code>data.py</code>, <code>split.py</code>, <code>train.py</code>, <code>evaluate.py</code>, <code>metrics.py</code></td>
+</tr>
+</tbody>
+</table></section><section id="rakesh"><h1>Viva Script — Rakesh (S20230010196)</h1>
+<h2>Your Focus Areas</h2>
+<ol>
+<li><strong>Baseline Comparison: ECFP4 + Random Forest</strong></li>
+<li><strong>Ablation Experiments &amp; Analysis</strong></li>
+<li><strong>Demo App, Limitations &amp; Future Work</strong></li>
+</ol>
+<blockquote>
+<p>Read <a href="#">00_OVERVIEW.md</a> first for the project-level context everyone shares.</p>
+</blockquote>
+<hr />
+<h1>PART 1: THE BASELINE — ECFP4 + RANDOM FOREST</h1>
+<h2>1.1 What Is ECFP (Extended-Connectivity Fingerprint)?</h2>
+<p><strong>Opening line for the viva:</strong></p>
+<blockquote>
+<p>"ECFP is the standard way to turn a molecule into a fixed-length vector. It's a Morgan
+fingerprint with radius 2, producing 2048 bits. For each atom, a fixed hash function looks
+at the atom and its neighbours within 2 bonds, and sets one bit in a 2048-length vector.
+The same molecule always gets the same bits, regardless of the task."</p>
+</blockquote>
+<p><strong>How ECFP4 works step by step:</strong>
+1. For each atom, collect its properties (element, bond count, charge, etc.)
+2. Look at all atoms within <strong>2 bonds</strong> (that's the radius-2 part, hence "ECFP<strong>4</strong>" =
+   diameter 4)
+3. Hash the neighbourhood information into one of <strong>2048 bit positions</strong>
+4. Set that bit to 1
+5. The final fingerprint: a 2048-bit binary vector (mostly zeros)</p>
+<p><strong>In our code (<code>baseline.py</code>):</strong></p>
+<pre><code class="language-python">_MORGAN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+
+def ecfp(smiles):
+    return np.stack([_MORGAN.GetFingerprintAsNumPy(parse_smiles(s)[0]) for s in smiles])
+</code></pre>
+<h2>1.2 ECFP vs Learned Fingerprint — The Key Comparison</h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>ECFP4 (Fixed)</th>
+<th>GCN (Learned)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>How it aggregates</strong></td>
+<td>Fixed hash of atom neighbourhoods</td>
+<td>Learned weighted average of atom features</td>
+</tr>
+<tr>
+<td><strong>Neighbourhood radius</strong></td>
+<td>2 bonds</td>
+<td>3 bonds (3 GCN layers)</td>
+</tr>
+<tr>
+<td><strong>Dimension</strong></td>
+<td>2048 bits</td>
+<td>256 floats</td>
+</tr>
+<tr>
+<td><strong>Task-specific?</strong></td>
+<td>No — same bits for any task</td>
+<td>Yes — fingerprint shaped by training</td>
+</tr>
+<tr>
+<td><strong>Bond types</strong></td>
+<td>Included in the hash</td>
+<td>Ignored by GCNConv</td>
+</tr>
+<tr>
+<td><strong>Atom counts</strong></td>
+<td>Presence only (bit is 1 or 0)</td>
+<td>Captured via mean pooling + mass feature</td>
+</tr>
+<tr>
+<td><strong>Differentiable?</strong></td>
+<td>No — can't backprop through a hash</td>
+<td>Yes — gradients flow end-to-end</td>
+</tr>
+<tr>
+<td><strong>Gradient explanations?</strong></td>
+<td>No</td>
+<td>Yes (saliency maps)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Critical distinction (say this in the viva):</strong></p>
+<blockquote>
+<p>"The word 'differentiable' is the key. ECFP uses a fixed hash — you can't take its
+gradient, so you can't train it end-to-end. The GCN replaces the hash with smooth
+operations (averages, matrix products, ReLU), so the loss gradient flows all the way
+back through the fingerprint into the weights. The fingerprint learns to emphasise
+whatever matters for the task."</p>
+</blockquote>
+<h2>1.3 What Is a Random Forest?</h2>
+<p>A random forest is an ensemble of <strong>500 decision trees</strong>, each trained on a random subset
+of the data and features. The final prediction is the average of all trees (regression) or
+majority vote (classification).</p>
+<p><strong>For ESOL:</strong></p>
+<pre><code class="language-python">rf = RandomForestRegressor(n_estimators=500, random_state=seed, n_jobs=-1)
+rf.fit(X[train], y[train, 0])
+pred = rf.predict(X[test])
+</code></pre>
+<p><strong>For Tox21:</strong></p>
+<pre><code class="language-python"># ONE separate forest per assay, trained only on rows labelled for that assay
+for t in range(12):
+    labelled_train = train[~np.isnan(y[train, t])]
+    rf = RandomForestClassifier(n_estimators=500, random_state=seed)
+    rf.fit(X[labelled_train], y[labelled_train, t])
+    pred[:, t] = rf.predict_proba(X[test])[:, 1]
+</code></pre>
+<p><strong>Why one forest per assay?</strong> Because each assay has different molecules labelled. Training
+one forest on all 12 tasks would need molecules labelled for all 12 — very few have that.</p>
+<h2>1.4 Why the RF Lost — Structural Reasons</h2>
+<ol>
+<li>
+<p><strong>Can't extrapolate:</strong> A random forest predicts by averaging training targets. It
+   <strong>cannot predict below its training range</strong>. In seed 1, PCBs (logS down to −11.6) were
+   all in test — the RF could only predict ≈ −4.6 (its training minimum).</p>
+</li>
+<li>
+<p><strong>ECFP doesn't count atoms:</strong> A bit is either 0 or 1. Three chlorines in a neighbourhood
+   set the same bit as one chlorine. The GCN sees atom counts through mean pooling and the
+   mass feature.</p>
+</li>
+<li>
+<p><strong>No task-specific features:</strong> ECFP gives the same bits whether predicting solubility or
+   toxicity. The GCN tailors its representation to the loss.</p>
+</li>
+<li>
+<p><strong>No gradient-based explanations:</strong> ECFP + RF is a black box — you can compute feature
+   importance but can't make atom-level saliency maps.</p>
+</li>
+</ol>
+<hr />
+<h1>PART 2: ABLATION EXPERIMENTS</h1>
+<h2>2.1 What Is an Ablation?</h2>
+<blockquote>
+<p>"An ablation study changes one component at a time to see if it matters. We ran three
+ablations on ESOL: depth (number of GCN layers), readout (pooling method), and split
+type (scaffold vs random)."</p>
+</blockquote>
+<h2>2.2 Depth Ablation — Number of GCN Layers</h2><div class="figs"><figure><a href="img/depth_ablation.png" target="_blank"><img src="img/depth_ablation.png" alt="Depth ablation: 1 to 4 layers are all within noise." loading="lazy"></a><figcaption>Depth ablation: 1 to 4 layers are all within noise.</figcaption></figure></div>
+<table>
+<thead>
+<tr>
+<th>Layers</th>
+<th>RMSE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1.082 ± 0.204</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1.002 ± 0.135</td>
+</tr>
+<tr>
+<td><strong>3 (default)</strong></td>
+<td><strong>1.063 ± 0.163</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>1.053 ± 0.156</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusion:</strong> Every difference is within one standard deviation. We <strong>cannot claim</strong> 3
+layers is best, or that depth matters at all at this dataset size.</p>
+<p><strong>Why no over-smoothing at 4 layers?</strong> Probably because of residual connections (skip
+connections from layer 2 onwards), which let later layers add refinements rather than replace
+the representation. ESOL is also too small to separate these settings.</p>
+<p><strong>How to explain over-smoothing:</strong></p>
+<blockquote>
+<p>"With many layers, every atom ends up averaging over nearly the whole molecule. All atom
+vectors converge to the same value. Then max pooling can't pick out any distinctive
+features — everything looks the same."</p>
+</blockquote>
+<h2>2.3 Readout Ablation — Pooling Method</h2>
+<table>
+<thead>
+<tr>
+<th>Readout</th>
+<th>RMSE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mean only</td>
+<td>0.985 ± 0.172</td>
+</tr>
+<tr>
+<td>Max only</td>
+<td>1.046 ± 0.072</td>
+</tr>
+<tr>
+<td><strong>Mean+Max (default)</strong></td>
+<td><strong>1.063 ± 0.163</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusion:</strong> Again, no clear winner. All within noise. We kept mean+max because it was
+the planned default, <strong>not because the ablation favoured it</strong>. (Say this — it shows honesty.)</p>
+<p><strong>Why both mean and max?</strong>
+- <strong>Mean</strong> captures: "what is this molecule made of on average?"
+- <strong>Max</strong> captures: "is there at least one atom of this kind?" (e.g., one nitro group
+  can dominate toxicity but would be diluted by mean)</p>
+<h2>2.4 Split Ablation — Scaffold vs Random</h2>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>GCN RMSE</th>
+<th>RF RMSE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Scaffold</strong></td>
+<td><strong>1.063 ± 0.163</strong></td>
+<td><strong>1.694 ± 0.498</strong></td>
+</tr>
+<tr>
+<td>Random</td>
+<td>0.800 ± 0.023</td>
+<td>1.256 ± 0.037</td>
+</tr>
+</tbody>
+</table>
+<p><strong>This is the one clear effect.</strong> Both models improve dramatically on random split. This
+improvement is <strong>leakage</strong> — the random split puts close analogues of test molecules in the
+training set.</p>
+<p><strong>Key observations:</strong>
+1. Both models improve, not just one — the leakage is universal.
+2. The standard deviations shrink on random split (0.023 vs 0.163) — the split is more
+   stable because there are no large scaffold groups to move around.
+3. This is <strong>why every headline number uses the scaffold split</strong>.</p>
+<h2>2.5 How to Present Ablations in the Viva</h2>
+<blockquote>
+<p>"We ran three ablations on ESOL. Depth and readout made no measurable difference — all
+variants were within noise. The split type was the one clear effect: switching from
+scaffold to random dropped the GCN's RMSE from 1.06 to 0.80, but that improvement is
+leakage from shared scaffolds between train and test, not real generalisation. We report
+this honestly to justify why all headline numbers use the scaffold split."</p>
+</blockquote>
+<hr />
+<h1>PART 3: THE DEMO APP</h1>
+<h2>3.1 What the Demo Does</h2><div class="figs"><figure><a href="img/demo_screenshot.png" target="_blank"><img src="img/demo_screenshot.png" alt="The demo app: draw a molecule, read both predictions, see atoms coloured by saliency." loading="lazy"></a><figcaption>The demo app: draw a molecule, read both predictions, see atoms coloured by saliency.</figcaption></figure><figure><a href="img/1_empty.png" target="_blank"><img src="img/1_empty.png" alt="Screen 1: empty start state." loading="lazy"></a><figcaption>Screen 1: empty start state.</figcaption></figure><figure><a href="img/2_aspirin.png" target="_blank"><img src="img/2_aspirin.png" alt="Screen 2: aspirin, ESOL prediction plus saliency." loading="lazy"></a><figcaption>Screen 2: aspirin, ESOL prediction plus saliency.</figcaption></figure><figure><a href="img/3_tox21_positive.png" target="_blank"><img src="img/3_tox21_positive.png" alt="Screen 3: a Tox21-positive molecule with per-assay scores." loading="lazy"></a><figcaption>Screen 3: a Tox21-positive molecule with per-assay scores.</figcaption></figure><figure><a href="img/4_invalid.png" target="_blank"><img src="img/4_invalid.png" alt="Screen 4: an invalid SMILES gives a friendly error, not a crash." loading="lazy"></a><figcaption>Screen 4: an invalid SMILES gives a friendly error, not a crash.</figcaption></figure></div>
+<p>A <strong>Streamlit</strong> web app at <code>http://localhost:8501</code>. The user can:</p>
+<ol>
+<li><strong>Enter a SMILES string</strong> or pick from 8 pre-loaded molecules (aspirin, caffeine,
+   paracetamol, ibuprofen, benzene, ethanol, nicotine, and a known toxic molecule the model
+   never saw in training).</li>
+<li>Press <strong>Predict</strong>.</li>
+<li>See:
+   - The molecule drawn with atoms <strong>coloured by saliency</strong> (red = pushes prediction up,
+     blue = pushes down)
+   - Predicted <strong>solubility</strong> in logS with a plain-language band (soluble / moderately
+     soluble / poorly soluble)
+   - <strong>12 toxicity probabilities</strong> (with a note: "model probability", never "risk")
+   - <strong>3 closest training molecules</strong> by cosine similarity of their 256-d learned
+     fingerprints</li>
+<li>Switch the colouring between solubility and any of the 12 toxicity assays.</li>
+</ol>
+<p><strong>URL parameter:</strong> <code>http://localhost:8501/?smiles=CCO</code> works directly.</p>
+<h2>3.2 Design Philosophy (From DESIGN.md</h2>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Choice</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Palette</td>
+<td>Paper white (#F6F8F7), ink black (#1C2321), one accent blue (#2F6FB0)</td>
+<td>Lab-paper aesthetic, readable on projector</td>
+</tr>
+<tr>
+<td>Font</td>
+<td>Atkinson Hyperlegible (Google Fonts)</td>
+<td>Designed for projector legibility</td>
+</tr>
+<tr>
+<td>SMILES font</td>
+<td>IBM Plex Mono</td>
+<td>Code must show exact characters</td>
+</tr>
+<tr>
+<td>Layout</td>
+<td>Two columns desktop, stacked mobile</td>
+<td>Left-aligned, clean</td>
+</tr>
+<tr>
+<td>Molecule drawing</td>
+<td>RDKit SVG, min 420px</td>
+<td>Memorable element, must be readable from back of room</td>
+</tr>
+<tr>
+<td>Saliency scale</td>
+<td>Blue ↔ white ↔ red (diverging)</td>
+<td>Data visualisation, not decoration</td>
+</tr>
+<tr>
+<td>Motion</td>
+<td>Saliency fade-in 250ms only</td>
+<td>Respects prefers-reduced-motion</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Forbidden:</strong> Rounded cards with shadows, gradient headers, all-caps, emoji, rainbow
+colormaps, Streamlit default red accent.</p>
+<h2>3.3 Input Validation &amp; Error Handling</h2>
+<p>The demo refuses bad input <strong>before</strong> anything can crash:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Limit</th>
+<th>Error Message</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Empty input</td>
+<td>—</td>
+<td>"Enter a SMILES string or pick a molecule to start."</td>
+</tr>
+<tr>
+<td>SMILES too long</td>
+<td>200 chars</td>
+<td>"Molecule too large for the demo (limit 100 heavy atoms)."</td>
+</tr>
+<tr>
+<td>Too many atoms</td>
+<td>100 heavy atoms</td>
+<td>Same message</td>
+</tr>
+<tr>
+<td>Invalid SMILES</td>
+<td>—</td>
+<td>"Couldn't read that SMILES. Check brackets and ring numbers, e.g. c1ccccc1."</td>
+</tr>
+<tr>
+<td>Missing checkpoint</td>
+<td>—</td>
+<td>Shows a one-liner pointing to <code>make train</code></td>
+</tr>
+</tbody>
+</table>
+<h2>3.4 Demo Caveats to Say Out Loud</h2>
+<ol>
+<li><strong>Predictions for famous drugs can be off</strong> even if they're in the training set (caffeine
+   is one). Early stopping picks the best validation epoch, not the one that memorises
+   training molecules.</li>
+<li><strong>"Closest training molecules"</strong> uses cosine similarity of the 256-d fingerprint, not
+   structural similarity. It shows what <strong>the model</strong> considers alike.</li>
+<li><strong>Toxicity probabilities run high</strong> because of pos_weight. Compare molecules with each
+   other, don't read 0.8 as "80% risk".</li>
+</ol>
+<hr />
+<h1>PART 4: LIMITATIONS</h1>
+<h2>4.1 Known Limitations (Be Ready to Discuss Each)</h2>
+<h3>1. GCNConv Ignores Bond Types</h3>
+<ul>
+<li>A C=O (double bond) and a C–O (single bond) send <strong>identical messages</strong>.</li>
+<li>Bond type, conjugation, and ring membership are already stored in <code>edge_attr</code>.</li>
+<li><strong>Fix:</strong> Replace GCNConv with an edge-aware layer:</li>
+<li><strong>GINE:</strong> message = MLP([h_neighbour, e_bond])</li>
+<li><strong>GATv2 with edge_dim:</strong> attention weights informed by bond features</li>
+<li><strong>D-MPNN:</strong> message-passing on bonds instead of atoms</li>
+<li>This would be a change to <strong><code>model.py</code> only</strong> — the featuriser already stores everything
+  needed.</li>
+</ul>
+<h3>2. ESOL Is Small</h3>
+<ul>
+<li>Only ~1,100 molecules, ~114 in the test set.</li>
+<li>One scaffold group (the PCBs) can move the RMSE by more than the difference between models.</li>
+<li>Seed-to-seed spread is large.</li>
+</ul>
+<h3>3. No Hyperparameter Tuning</h3>
+<ul>
+<li>Hyperparameters were fixed in advance for both models.</li>
+<li>A tuned RF (or one with count-based fingerprints instead of bits) would probably close
+  some of the ESOL gap.</li>
+</ul>
+<h3>4. Tox21 Probabilities Are Not Calibrated</h3>
+<ul>
+<li>The pos_weight inflates predicted probabilities.</li>
+<li>The demo shows them for <strong>ranking molecules</strong>, not as absolute risk.</li>
+</ul>
+<h3>5. Three Seeds ≠ Significance Test</h3>
+<ul>
+<li>Three runs give a rough error bar, not a formal statistical test.</li>
+<li>For proper significance: more seeds + a paired test (e.g., paired t-test or Wilcoxon).</li>
+</ul>
+<hr />
+<h1>PART 5: FUTURE WORK</h1>
+<h2>5.1 Concrete Next Steps (Ranked by Impact)</h2>
+<h3>1. Edge-Aware Message Passing (Highest Priority)</h3>
+<blockquote>
+<p>"Replace GCNConv with GINE or GATv2 with <code>edge_dim</code>, so the model can distinguish single
+from double bonds. Our featuriser already stores bond type, conjugation, and ring membership.
+We'd only change <code>model.py</code>. This should help especially on conjugated systems where
+bond order matters for solubility and reactivity."</p>
+</blockquote>
+<h3>2. Deterministic DeepChem Scaffold Split</h3>
+<blockquote>
+<p>"Compare against DeepChem's deterministic split, where the rarest scaffolds go to test.
+This would let us place our Tox21 numbers alongside published results."</p>
+</blockquote>
+<h3>3. Saliency Validation by Deletion</h3>
+<blockquote>
+<p>"Mask the top-k salient atoms and measure how much the prediction moves vs masking
+random atoms. If saliency is meaningful, the prediction should move more when salient
+atoms are masked."</p>
+</blockquote>
+<h3>4. Additional Ideas</h3>
+<ul>
+<li><strong>Larger datasets:</strong> BBBP (blood-brain barrier), BACE, HIV from MoleculeNet.</li>
+<li><strong>Attention visualisation:</strong> GATv2 would give interpretable attention weights per edge.</li>
+<li><strong>Calibration:</strong> Platt scaling or temperature scaling for Tox21 probabilities.</li>
+<li><strong>Uncertainty quantification:</strong> Monte Carlo dropout or ensembles.</li>
+</ul>
+<hr />
+<h1>PART 6: COMPARISON TABLE — GCN vs ECFP+RF (Your Summary Slide)</h1>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>GCN (Learned FP)</th>
+<th>ECFP4 + Random Forest</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fingerprint</td>
+<td>256-d, task-specific, learned</td>
+<td>2048-bit, fixed, task-agnostic</td>
+</tr>
+<tr>
+<td>Bond awareness</td>
+<td>No (GCNConv limitation)</td>
+<td>Yes (included in hash)</td>
+</tr>
+<tr>
+<td>Atom counting</td>
+<td>Yes (mean pool + mass)</td>
+<td>No (bit = present or not)</td>
+</tr>
+<tr>
+<td>Can extrapolate</td>
+<td>Somewhat (linear head)</td>
+<td>No (bounded by training range)</td>
+</tr>
+<tr>
+<td>Explainability</td>
+<td>Atom-level saliency maps</td>
+<td>Feature importance only</td>
+</tr>
+<tr>
+<td>Training time</td>
+<td>~1 min/seed (ESOL, CPU)</td>
+<td>Seconds</td>
+</tr>
+<tr>
+<td>Complexity</td>
+<td>~87K parameters</td>
+<td>500 trees, no gradients</td>
+</tr>
+<tr>
+<td>ESOL RMSE</td>
+<td><strong>1.063 ± 0.163</strong></td>
+<td>1.694 ± 0.498</td>
+</tr>
+<tr>
+<td>Tox21 ROC-AUC</td>
+<td><strong>0.811 ± 0.009</strong></td>
+<td>0.756 ± 0.015</td>
+</tr>
+<tr>
+<td>Wins on Tox21 assays</td>
+<td><strong>11/12</strong></td>
+<td>1/12 (SR-ARE)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1>POSSIBLE QUESTIONS FOR RAKESH</h1>
+<h3>Q1: "Why use ECFP as the baseline instead of another GNN?"</h3>
+<p>→ "ECFP + random forest is the standard baseline in molecular property prediction papers.
+It's well-established, fast, and requires no deep learning. Comparing a GNN against it
+tests whether the added complexity of learning a fingerprint is justified. For a GNN-vs-GNN
+comparison (e.g., GCN vs GAT vs MPNN), we'd need more computational budget and it would be
+a different research question — 'which GNN architecture' rather than 'does learning a
+fingerprint help'."</p>
+<h3>Q2: "Can the RF ever beat the GCN?"</h3>
+<p>→ "Yes, in specific cases. On Tox21 SR-ARE, the RF actually beats the GCN (0.746 vs 0.734).
+A tuned RF with count-based fingerprints (instead of binary bits) might also close the ESOL
+gap. The GCN's advantage is structural — it learns task-specific features and can capture
+atom-count information — but the RF is simpler, faster, and has fewer failure modes."</p>
+<h3>Q3: "What would you change if you had more time?"</h3>
+<p>→ "Three things, in order: (1) Replace GCNConv with an edge-aware layer like GINE or GATv2
+to use bond features we already store. (2) Compare against DeepChem's deterministic scaffold
+split so our Tox21 numbers are directly comparable with papers. (3) Validate the saliency
+maps with a deletion test — mask top-k salient atoms and check if the prediction moves more
+than masking random atoms."</p>
+<h3>Q4: "Why does the demo warn against reading toxicity probabilities as risk?"</h3>
+<p>→ "Because we use pos_weight to handle class imbalance. Only 7.5% of labelled entries are
+positive, so we upweight them during training. This makes the model take toxic examples more
+seriously, but it also inflates the predicted probabilities. A molecule with a predicted
+probability of 0.8 is not '80% likely to be toxic' — it just scores higher than one
+predicted at 0.3. For absolute risk you'd need calibration (Platt scaling or temperature
+scaling), which we didn't implement."</p>
+<h3>Q5: "How does the 'closest training molecules' feature work?"</h3>
+<p>→ "At startup, the app computes the 256-dimensional learned fingerprint for every training
+molecule using <code>model.embed()</code>. When a new molecule is entered, we compute its fingerprint
+and find the 3 training molecules with the highest cosine similarity. This shows what the
+model considers structurally similar — which may differ from traditional chemical
+similarity."</p>
+<h3>Q6: "Is this ready for real drug discovery?"</h3>
+<p>→ "No. It's a research demo. The model wasn't validated against experimental measurements
+beyond ESOL and Tox21. Tox21 probabilities are uncalibrated. The saliency maps are
+approximate. ESOL is tiny and results depend on the split. For real use you'd need more
+diverse training data, proper calibration, external validation, and regulatory review.
+The footer says 'Research demo. Not for safety or medical decisions.'"</p>
+<hr />
+<h1>QUICK REFERENCE CARD</h1>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Baseline fingerprint</td>
+<td>ECFP4 (Morgan radius 2, 2048 bits)</td>
+</tr>
+<tr>
+<td>Baseline model</td>
+<td>RandomForestRegressor/Classifier, 500 trees</td>
+</tr>
+<tr>
+<td>Tox21 RF approach</td>
+<td>1 forest per assay, trained on labelled rows only</td>
+</tr>
+<tr>
+<td>Ablation: depth</td>
+<td>1, 2, 3, 4 layers → all within noise</td>
+</tr>
+<tr>
+<td>Ablation: readout</td>
+<td>mean, max, mean+max → all within noise</td>
+</tr>
+<tr>
+<td>Ablation: split</td>
+<td>scaffold vs random → random is leaky (clear effect)</td>
+</tr>
+<tr>
+<td>Demo app</td>
+<td>Streamlit at localhost:8501</td>
+</tr>
+<tr>
+<td>Demo molecules</td>
+<td>8 presets + custom SMILES</td>
+</tr>
+<tr>
+<td>Input limits</td>
+<td>200 chars, 100 heavy atoms</td>
+</tr>
+<tr>
+<td>#1 limitation</td>
+<td>GCNConv ignores bond types</td>
+</tr>
+<tr>
+<td>#1 future work</td>
+<td>Edge-aware layer (GINE/GATv2)</td>
+</tr>
+<tr>
+<td>Key code files</td>
+<td><code>baseline.py</code>, <code>evaluate.py</code> (ablation path), <code>app/streamlit_app.py</code></td>
+</tr>
+</tbody>
+</table></section><section id="cheat"><h1>⚡ Quick Revision Cheat Sheet (All Members)</h1>
+<p>Print this or keep it on your phone. Glance at it before walking into the viva.</p>
+<hr />
+<h2>🔤 The One-Liner</h2>
+<p>"GCN learns a task-specific molecular fingerprint from atom graphs; beats ECFP+RF on ESOL
+and Tox21 with scaffold splits."</p>
+<hr />
+<h2>📊 Results Table (Memorise)</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>ESOL RMSE ↓</th>
+<th>ESOL R² ↑</th>
+<th>Tox21 AUC ↑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GCN</strong></td>
+<td><strong>1.063 ± 0.163</strong></td>
+<td><strong>0.709</strong></td>
+<td><strong>0.811 ± 0.009</strong></td>
+</tr>
+<tr>
+<td>RF</td>
+<td>1.694 ± 0.498</td>
+<td>0.267</td>
+<td>0.756 ± 0.015</td>
+</tr>
+</tbody>
+</table>
+<p>GCN wins 11/12 Tox21 assays. RF wins only SR-ARE.</p>
+<hr />
+<h2>🧬 Pipeline in 5 Seconds</h2>
+<p>SMILES → RDKit → 35-dim atom features → 3 GCNConv layers → mean+max pool → <strong>256-d
+fingerprint</strong> → MLP → prediction</p>
+<hr />
+<h2>📐 The Equation</h2>
+<p><strong>H' = D^{−½}(A+I)D^{−½} H W</strong>
+- A+I = self-loop (keep own identity)
+- D^{−½} = degree normalisation (fair averaging)
+- W = shared learned weights</p>
+<hr />
+<h2>🛡️ Anti-Leakage Guarantees (Impress the Panel)</h2>
+<ol>
+<li>Scaffold split — no scaffold crosses sets</li>
+<li>Test set used once — scramble test → bit-identical weights</li>
+<li>Same split for both models — hash-checked</li>
+<li>Train-only normalisation stats</li>
+<li>All numbers auto-generated from results JSON</li>
+</ol>
+<hr />
+<h2>⚠️ Caveats to Mention FIRST (Shows Maturity)</h2>
+<ul>
+<li>Seed 1 ESOL inflates the gap (PCBs in test)</li>
+<li>Tox21 AUC above expected band (easier split than DeepChem)</li>
+<li>Hyperparameters not tuned (fair but maybe not optimal)</li>
+<li>3 seeds = rough error bar, not significance test</li>
+<li>GCNConv ignores bond types (C=O ≡ C–O)</li>
+</ul>
+<hr />
+<h2>🔮 Future Work (Top 3)</h2>
+<ol>
+<li>Edge-aware layer (GINE/GATv2) to use bond features</li>
+<li>DeepChem deterministic split for comparable Tox21 numbers</li>
+<li>Saliency validation by atom deletion</li>
+</ol>
+<hr />
+<h2>🎯 Who Covers What</h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Who</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GCN architecture, equation, residuals, pooling</td>
+<td><strong>Kumaraswamy</strong></td>
+</tr>
+<tr>
+<td>Featurisation (35-dim atoms, graph rules)</td>
+<td><strong>Kumaraswamy</strong></td>
+</tr>
+<tr>
+<td>Saliency / explainability</td>
+<td><strong>Kumaraswamy</strong></td>
+</tr>
+<tr>
+<td>Data loading, scaffold splitting algorithm</td>
+<td><strong>Simon Peter</strong></td>
+</tr>
+<tr>
+<td>Training loop, loss functions, early stopping</td>
+<td><strong>Simon Peter</strong></td>
+</tr>
+<tr>
+<td>Evaluation, metrics, reproducibility tests</td>
+<td><strong>Simon Peter</strong></td>
+</tr>
+<tr>
+<td>ECFP4 + RF baseline comparison</td>
+<td><strong>Rakesh</strong></td>
+</tr>
+<tr>
+<td>Ablation experiments (depth, readout, split)</td>
+<td><strong>Rakesh</strong></td>
+</tr>
+<tr>
+<td>Demo app, limitations, future work</td>
+<td><strong>Rakesh</strong></td>
+</tr>
+<tr>
+<td><strong>Shared overview, results, project motivation</strong></td>
+<td><strong>Everyone</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>🔢 Numbers to Have Ready</h2>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Number</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ESOL molecules</td>
+<td>1,128</td>
+</tr>
+<tr>
+<td>Tox21 molecules</td>
+<td>7,823</td>
+</tr>
+<tr>
+<td>Atom feature dimension</td>
+<td>35</td>
+</tr>
+<tr>
+<td>Hidden dimension</td>
+<td>128</td>
+</tr>
+<tr>
+<td>Fingerprint dimension</td>
+<td>256</td>
+</tr>
+<tr>
+<td>GCN layers</td>
+<td>3</td>
+</tr>
+<tr>
+<td>ECFP bits</td>
+<td>2,048</td>
+</tr>
+<tr>
+<td>RF trees</td>
+<td>500</td>
+</tr>
+<tr>
+<td>Tox21 assays</td>
+<td>12</td>
+</tr>
+<tr>
+<td>Tox21 missing labels</td>
+<td>17%</td>
+</tr>
+<tr>
+<td>Tox21 positive rate</td>
+<td>7.5%</td>
+</tr>
+<tr>
+<td>Train/val/test</td>
+<td>80/10/10</td>
+</tr>
+<tr>
+<td>Seeds</td>
+<td>0, 1, 2</td>
+</tr>
+<tr>
+<td>Patience</td>
+<td>30 epochs</td>
+</tr>
+<tr>
+<td>Max epochs</td>
+<td>300</td>
+</tr>
+<tr>
+<td>Learning rate</td>
+<td>1e-3</td>
+</tr>
+<tr>
+<td>Dropout</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>Total tests</td>
+<td>34</td>
+</tr>
+<tr>
+<td><code>make all</code> time</td>
+<td>11 min (M2 CPU)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p>Good luck! 🍀</p></section></main>
+<script>
+const tabs=[...document.querySelectorAll('nav a')],secs=[...document.querySelectorAll('section')];
+function show(){const t=(location.hash||'#overview').slice(1);const ok=secs.some(s=>s.id===t)?t:'overview';
+secs.forEach(s=>s.classList.toggle('on',s.id===ok));tabs.forEach(a=>a.classList.toggle('on',a.dataset.tab===ok));scrollTo(0,0)}
+addEventListener('hashchange',show);show();
+</script></body></html>

@@ -34,7 +34,9 @@ by `python -m molfp.figures` from `results/*.json`.
 New to the project? Start with [docs/PROJECT_IN_SIMPLE_WORDS.md](docs/PROJECT_IN_SIMPLE_WORDS.md).
 Full write-up: [reports/REPORT.md](reports/REPORT.md). Viva notes: [docs/EXPLAIN.md](docs/EXPLAIN.md).
 
-## Reproduce
+## How to run
+
+Quick start: `make all` once, then `make demo` and open http://localhost:8501.
 
 Needs [uv](https://docs.astral.sh/uv/). `make all` took 11 min on an Apple M2 CPU from a fresh clone
 (plus package download time on first install), and reproduced every committed result byte for byte.
